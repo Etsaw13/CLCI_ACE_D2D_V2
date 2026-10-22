@@ -1,0 +1,82 @@
+{
+  "phase": "Implemented; target VCS pending",
+  "static": {
+    "library": "Accellera UVM 1.2 complete source",
+    "tool": "pyslang 8.1.0",
+    "errors": 0,
+    "diagnostics": 3132,
+    "native_macro_syntax_errors": 0,
+    "native_macro_diagnostics": 3161,
+    "real_clci_port_header": true,
+    "encrypted_body_included": false,
+    "native_header": "constant-only syntax stub; PLI not executed"
+  },
+  "execution_adapter": {
+    "tool": "Verilator 5.34",
+    "total": 145,
+    "pass": 145,
+    "actual_new_ace": true,
+    "clci": "three-stage independent channel buffers; NOT shipped",
+    "adapted_bodies": "production APB/control/monitor/checker functions executed in module harness; virtual interface replaced by static wires",
+    "full_uvm_scheduler_executed": false,
+    "diagnostics": [
+      {
+        "mode": 0,
+        "exit": -6,
+        "outcome": "DIAGNOSTIC_FAIL",
+        "expected_observation": true
+      },
+      {
+        "mode": 1,
+        "exit": 0,
+        "outcome": "PASS",
+        "expected_observation": true
+      },
+      {
+        "mode": 2,
+        "exit": -6,
+        "outcome": "DIAGNOSTIC_FAIL",
+        "expected_observation": true
+      },
+      {
+        "mode": 3,
+        "exit": -6,
+        "outcome": "DIAGNOSTIC_FAIL",
+        "expected_observation": true
+      },
+      {
+        "mode": 4,
+        "exit": -6,
+        "outcome": "DIAGNOSTIC_FAIL",
+        "expected_observation": true
+      },
+      {
+        "mode": 5,
+        "exit": -6,
+        "outcome": "DIAGNOSTIC_FAIL",
+        "expected_observation": true
+      }
+    ]
+  },
+  "tools": {
+    "total": 40,
+    "pass": 40
+  },
+  "target_vcs_executed": false,
+  "target_real_clci_executed": false,
+  "source_checksums": {
+    "uvm/ace_uvm_apb.svh": "b2ac77a543642ab054720f82789fe15032f3ea2370b9f660b91f883526116623",
+    "uvm/ace_uvm_cache_cov_pkg.sv": "b038c3e65735d9f06d5ea3c55d0d19f4e2837dd2327e8720b8e119d4cf990e09",
+    "uvm/ace_uvm_checker_pkg.sv": "d4ee99c5ab5243df0eefc694b6d5d7e667d04d5eb6a055ccabfee9f837c3048b",
+    "uvm/ace_uvm_env.svh": "8e52d15e1aa4c3bad524fac26f26543da92735168ed327c2e4dcb60d570db26d",
+    "uvm/ace_uvm_if.sv": "666cc849f100bed637f0f418466e48b6ab5805af90db50d6a3408768a06aaeac",
+    "uvm/ace_uvm_model_pkg.sv": "c93b988af6e5251e59a9157c6198ea0620d649f21fcec8b4bf3f0ccfb92b928c",
+    "uvm/ace_uvm_monitor.svh": "e5ef626545fdb37ffd071f2d32366506b2a73a801f2dee8f8dbee0956cda72f0",
+    "uvm/ace_uvm_pkg.sv": "f8002af79f5a77dedabac55c33ac6f5da704869190c8f03096f4f9af24b3a73a",
+    "uvm/ace_uvm_runtime_cov_pkg.sv": "bdace1f74d6920875c84be5e4b162bf15ffa51220243d9c0ffb96a082432db0f",
+    "uvm/ace_uvm_sequences.svh": "ebcebc38c322b2b90ffded046159ba6d7df6e79f901057c4946eb6974208c434",
+    "uvm/ace_uvm_tests.svh": "d002e7495a37bfc2359800f9335ef20cf45724bd991102fa1eb9014556a84132",
+    "uvm/observe.svh": "8deda556fefbb9e93b22b0de4884adbe1e9d06ed958e0ebb42fd7a1f06a81e5c",
+    "uvm/tb_top.sv": "50bc77f7e75a327e39d15ffc33cfc127ab8a7ac5d3396c16c821e5b3fe869296"
+  }
+}

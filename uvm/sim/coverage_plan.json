@@ -1,0 +1,112 @@
+{
+  "plan": "ace_v2_44",
+  "metrics": [
+    {
+      "id": 0,
+      "group": "Basic",
+      "name": "Transaction class",
+      "bins": [
+        "SW",
+        "SR",
+        "BW",
+        "BR"
+      ]
+    },
+    {
+      "id": 1,
+      "group": "Basic",
+      "name": "ACE attribute",
+      "bins": [
+        "WU",
+        "WLU",
+        "RS",
+        "RU",
+        "RO"
+      ]
+    },
+    {
+      "id": 2,
+      "group": "Basic",
+      "name": "Request start line",
+      "bins": [
+        "L0",
+        "L1",
+        "L2",
+        "L3"
+      ]
+    },
+    {
+      "id": 3,
+      "group": "Basic",
+      "name": "Burst length",
+      "bins": [
+        "2",
+        "3",
+        "4",
+        "5..15",
+        "16..254",
+        "255",
+        "256"
+      ]
+    },
+    {
+      "id": 4,
+      "group": "Coherence",
+      "name": "Snoop type",
+      "bins": [
+        "RS",
+        "MI",
+        "CI",
+        "RO"
+      ]
+    },
+    {
+      "id": 5,
+      "group": "Coherence",
+      "name": "CR response",
+      "bins": [
+        "none(0)",
+        "shared(8)",
+        "unique(16)",
+        "unique_shared(24)",
+        "dirty_data(21)"
+      ]
+    },
+    {
+      "id": 6,
+      "group": "Coherence",
+      "name": "R tag",
+      "bins": [
+        "plain",
+        "PassDirty",
+        "IsShared"
+      ]
+    },
+    {
+      "id": 7,
+      "group": "Data",
+      "name": "Data mode",
+      "bins": [
+        "PRBS31",
+        "fixed_byte",
+        "sequence",
+        "walking_one",
+        "PRBS23",
+        "PRBS10"
+      ]
+    },
+    {
+      "id": 8,
+      "group": "Cache",
+      "name": "Cache behavior",
+      "bins": [
+        "WU_invalid",
+        "WLU_UC",
+        "RU_PD_UD",
+        "RS_IS_SC",
+        "UC_RS_SC",
+        "UD_CI_CD_invalid"
+      ]
+    }
+  ]
+}

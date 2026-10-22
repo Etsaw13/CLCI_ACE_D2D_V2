@@ -1,0 +1,162 @@
+{
+  "ace_commit": "6c306d613fd095f712caa8df44ccbe82f55569ae",
+  "clci_baseline": "myserver:/cluster/home/yvly/mywork/CLCI_ACE_D2D",
+  "phase": "DV and independent UVM implemented; target VCS/CLCI validation pending",
+  "files": [
+    {
+      "path": "ace/ace_pkg.sv",
+      "source": "ACE git 6c306d613fd095f712caa8df44ccbe82f55569ae/rtl/ace_pkg.sv",
+      "sha256": "f18c24bd8e73f130b67e377cf9cec5efe3b1489cd06511e0631d4344cafea71f"
+    },
+    {
+      "path": "ace/ace_funcs.svh",
+      "source": "ACE git 6c306d613fd095f712caa8df44ccbe82f55569ae/rtl/ace_funcs.svh",
+      "sha256": "3e3aba622f0e602b44127d56e7fafc74656de6dbb06cdb26938a8dc8970ddb58"
+    },
+    {
+      "path": "ace/module_a.sv",
+      "source": "ACE git 6c306d613fd095f712caa8df44ccbe82f55569ae/rtl/module_a.sv",
+      "sha256": "b34cff86db0aab09f287f6b1e569062ec84e8ff9cbcbc35fc3f85b46a628da29"
+    },
+    {
+      "path": "ace/module_b.sv",
+      "source": "ACE git 6c306d613fd095f712caa8df44ccbe82f55569ae/rtl/module_b.sv",
+      "sha256": "2c1ed801b1db4bf155cca5e4517a7e5039836ebd34c7f66020a2ff2d1025bab4"
+    },
+    {
+      "path": "clci/rtl/define_bmx_ace128.v",
+      "source": "old CLCI_ACE_D2D/ucie_r3_sim/src_all/src/define_bmx_ace128.v",
+      "sha256": "8decde59b16f50d60fddd55fdd05b6c102bc4f86d9e40179c3c5eeb3b9173f9a"
+    },
+    {
+      "path": "clci/include/sram_wrapper/rom_4096x64.v",
+      "source": "old CLCI_ACE_D2D/ucie_r3_sim/src_all/include/sram_wrapper/rom_4096x64.v",
+      "sha256": "58d438c35200cec6eb9ba788ad7d2da862f98af190046c41da8e66a4f0d6ac77"
+    },
+    {
+      "path": "clci/include/sram_wrapper/sdpram_256x129.v",
+      "source": "old CLCI_ACE_D2D/ucie_r3_sim/src_all/include/sram_wrapper/sdpram_256x129.v",
+      "sha256": "761be2edb8b1dc3ee3c42cff3064ae2350846bf40d00aa4050127413562f83e4"
+    },
+    {
+      "path": "clci/include/sram_wrapper/sdpram_256x145.v",
+      "source": "old CLCI_ACE_D2D/ucie_r3_sim/src_all/include/sram_wrapper/sdpram_256x145.v",
+      "sha256": "1514f85f22586cbe76ec0da51bbc8d1d22d71ac192a2f7ec7d4569104f04078f"
+    },
+    {
+      "path": "clci/include/sram_wrapper/sdpram_256x149.v",
+      "source": "old CLCI_ACE_D2D/ucie_r3_sim/src_all/include/sram_wrapper/sdpram_256x149.v",
+      "sha256": "80ae7d3f64eb10f7411c84f6c185d33bb44f58dcfa669a7e3db781a40e9d68dc"
+    },
+    {
+      "path": "clci/include/sram_wrapper/sdpram_256x18.v",
+      "source": "old CLCI_ACE_D2D/ucie_r3_sim/src_all/include/sram_wrapper/sdpram_256x18.v",
+      "sha256": "b25c76c879ebd82a907843496a248938efa9c459dbdf207316b5cc82f3c1f1f4"
+    },
+    {
+      "path": "clci/include/sram_wrapper/sdpram_256x66.v",
+      "source": "old CLCI_ACE_D2D/ucie_r3_sim/src_all/include/sram_wrapper/sdpram_256x66.v",
+      "sha256": "20a9d89a347768c276af4b70dc0da19f6be21e3150e74ba01d4eedeb098cbc58"
+    },
+    {
+      "path": "clci/include/sram_wrapper/sdpram_256x97.v",
+      "source": "old CLCI_ACE_D2D/ucie_r3_sim/src_all/include/sram_wrapper/sdpram_256x97.v",
+      "sha256": "b3b18538364f6d0e167fa44c785bdf259db0f9dcffb39938b6780b3f105f20cf"
+    },
+    {
+      "path": "clci/include/sram_wrapper/sdpram_32x129.v",
+      "source": "old CLCI_ACE_D2D/ucie_r3_sim/src_all/include/sram_wrapper/sdpram_32x129.v",
+      "sha256": "5b2f205234c61a93344cfe1c9e5bda442ab3effede36a5e7d70a87527d1a9ee2"
+    },
+    {
+      "path": "clci/include/sram_wrapper/sdpram_32x145.v",
+      "source": "old CLCI_ACE_D2D/ucie_r3_sim/src_all/include/sram_wrapper/sdpram_32x145.v",
+      "sha256": "4ec81f0bf95d08f30aa7861fd0fa250543a62126e89314db67e8deca5173641e"
+    },
+    {
+      "path": "clci/include/sram_wrapper/sdpram_32x149.v",
+      "source": "old CLCI_ACE_D2D/ucie_r3_sim/src_all/include/sram_wrapper/sdpram_32x149.v",
+      "sha256": "0f1045c9d7cd85a7d2aa1f6d81e8a71086bb0f1337ad4675182f14b6e65d08b1"
+    },
+    {
+      "path": "clci/include/sram_wrapper/sdpram_32x66.v",
+      "source": "old CLCI_ACE_D2D/ucie_r3_sim/src_all/include/sram_wrapper/sdpram_32x66.v",
+      "sha256": "a97b8f01d505604047836e78a2ef5e392a32bc3b8941579397dff7b8890f0949"
+    },
+    {
+      "path": "clci/include/sram_wrapper/sdpram_32x97.v",
+      "source": "old CLCI_ACE_D2D/ucie_r3_sim/src_all/include/sram_wrapper/sdpram_32x97.v",
+      "sha256": "176cf88a741d0d63a0f33ac81accc579e043c60784f27ba86305c438a6f1c56e"
+    },
+    {
+      "path": "clci/include/sram_wrapper/sdpram_64x1248.v",
+      "source": "old CLCI_ACE_D2D/ucie_r3_sim/src_all/include/sram_wrapper/sdpram_64x1248.v",
+      "sha256": "fb0586e8f59fd6e2634a12bcd4649dc1d8e6eaadd32e05f8ae33d15bca665bca"
+    },
+    {
+      "path": "clci/include/sram_wrapper/sdpram_64x80.v",
+      "source": "old CLCI_ACE_D2D/ucie_r3_sim/src_all/include/sram_wrapper/sdpram_64x80.v",
+      "sha256": "8a667c315bae21091101ed349c8c95028c5b3e9199a9091687aed32bcb1c212f"
+    },
+    {
+      "path": "clci/include/sram_wrapper/sram_4096x64.v",
+      "source": "old CLCI_ACE_D2D/ucie_r3_sim/src_all/include/sram_wrapper/sram_4096x64.v",
+      "sha256": "5e483334acbda2a5513cec741be6511fc76ad95595180908745d12299c9cf90d"
+    },
+    {
+      "path": "clci/models/n28_dline_coarse_4b_gray_ccs.v",
+      "source": "old CLCI_ACE_D2D/ucie_r3_sim/src_all/0_lib/macro/n28_dline_coarse_4b_gray_ccs.v",
+      "sha256": "0257f067acb7ce3ea5546edaa6645f04930f465b74f55293f92f4b40860b2609"
+    },
+    {
+      "path": "clci/models/sideband_rx_v2.v",
+      "source": "old CLCI_ACE_D2D/ucie_r3_sim/src_all/0_lib/macro/sideband_rx_v2.v",
+      "sha256": "b09e0dda3444fe95b944abc838b308261a9f16c5bb383715157a8e8b83815fc7"
+    },
+    {
+      "path": "clci/models/sideband_tx_v2.v",
+      "source": "old CLCI_ACE_D2D/ucie_r3_sim/src_all/0_lib/macro/sideband_tx_v2.v",
+      "sha256": "b52099503664fc2db75332a7bf91b5662d953121f41fb51712091ba4d5f95fd3"
+    },
+    {
+      "path": "clci/models/ssttx_cmlrx_16lane_top.behav.v",
+      "source": "old CLCI_ACE_D2D/ucie_r3_sim/src_all/0_lib/macro/ssttx_cmlrx_16lane_top.behav.v",
+      "sha256": "9ba56a7dab3e3a575120f5c3d6adda92e11dd2c3ddddc46791ba0c6744d733f7"
+    },
+    {
+      "path": "clci/include/cmlib.v",
+      "source": "old CLCI_ACE_D2D/ucie_r3_sim/src_all/include/cmlib.v",
+      "sha256": "7187a75e715313fa1e1f9fc86e8b08159bd8cd7db3c7d0d4082604755f5f873c"
+    },
+    {
+      "path": "clci/rtl/clci_subsys_wo_sphy.v",
+      "source": "old CLCI_ACE_D2D/ucie_r3_sim/src_all/src/clci_subsys_wo_sphy.v",
+      "sha256": "2ce3908166de6cbd340880e93c753e4d2a155a39a048530313c633c1ec8a24f2"
+    },
+    {
+      "path": "clci/rtl/clci_sphy_all.v",
+      "source": "old CLCI_ACE_D2D/ucie_r3_sim/src_all/src/clci_sphy_all.v",
+      "sha256": "003d0a3eeac13c6471c054e62b8c74d225dd3abbec8d93968e5704e922c6e0e3"
+    },
+    {
+      "path": "clci/include/typical_pd_nodccm/pic_map_auto.h",
+      "source": "old CLCI_ACE_D2D/ucie_r3_sim/src_all/include/typical_pd_nodccm/pic_map_auto.h",
+      "sha256": "ddb724a2b11099a32e133927bceff311f03a5ed23e510a9a4285568a7dc8929e"
+    },
+    {
+      "path": "clci/include/typical_pd_nodccm/el2_param.vh",
+      "source": "old CLCI_ACE_D2D/ucie_r3_sim/src_all/include/typical_pd_nodccm/el2_param.vh",
+      "sha256": "55b4517fa0808fd7524caa1ef5acfb734fafc628057b7c91742859646b2c73e6"
+    },
+    {
+      "path": "clci/rom/TS3N28HPCPA4096X64M16MBS.rom.v",
+      "source": "work/v2_vendor_baseline/src_all/rom_dat/TS3N28HPCPA4096X64M16MBS.rom.v",
+      "sha256": "3c85569b2d766a682e3b48fcffcf7df287f9bbd6867f2f17fe5271483df7eb6a"
+    },
+    {
+      "path": "clci/models/clci_init_mem.sv",
+      "source": "work/v2_vendor_baseline/clci_init_mem.sv",
+      "sha256": "0b566b7b9909ebfbaf71d7bbbb7c19dff68f0107ef1f364cf129c7c4a770ef14"
+    }
+  ]
+}

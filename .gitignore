@@ -1,0 +1,10 @@
+dv/out/
+uvm/out/
+__pycache__/
+.DS_Store
+*.pyc
+*.vcd
+*.fsdb
+*.vpd
+core
+core.*

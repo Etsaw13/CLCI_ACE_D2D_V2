@@ -1,0 +1,98 @@
+{
+  "date": "2026-10-20",
+  "phase": "DV first-batch validation record; current UVM validation is recorded separately",
+  "ace_commit": "6c306d613fd095f712caa8df44ccbe82f55569ae",
+  "immutable_assets": 31,
+  "compiled_filelist_sources": 32,
+  "static": {
+    "tool": "pyslang 8.1.0",
+    "real_clci_port_header": true,
+    "encrypted_clci_body_included": false,
+    "errors": 0,
+    "diagnostics": 842,
+    "native_enabled_syntax_errors": 0,
+    "native_header_for_syntax": "constant-only stub; native PLI not executed"
+  },
+  "simulation": {
+    "tool": "Verilator 5.34",
+    "actual_new_ace": true,
+    "clci_replaced_in_local_validation_only": true,
+    "shipped_filelist_uses_actual_clci": true,
+    "transparent": {
+      "total": 103,
+      "pass": 103,
+      "fail": 0
+    },
+    "buffered": {
+      "total": 103,
+      "pass": 103,
+      "fail": 0
+    },
+    "additional_mixed": {
+      "total": 15,
+      "pass": 15,
+      "fail": 0
+    },
+    "checker_unit": {
+      "total": 9,
+      "pass": 9,
+      "fail": 0
+    },
+    "parser_and_cli": {
+      "total": 242,
+      "pass": 242,
+      "fail": 0
+    },
+    "boundary_matrix": {
+      "modes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "beats": [
+        2,
+        3,
+        4,
+        5,
+        8,
+        16,
+        255,
+        256
+      ],
+      "directions": [
+        "write",
+        "read"
+      ]
+    },
+    "additional_mixed_matrix": {
+      "modes": [
+        0,
+        1,
+        2
+      ],
+      "beats": [
+        2,
+        3,
+        5,
+        8,
+        16
+      ],
+      "tx_target": 64
+    }
+  },
+  "target_vcs_compilation_tested": false,
+  "target_real_clci_simulation_tested": false,
+  "native_vcs_coverage_query_executed_for_v2": false,
+  "verification_source_checksums": {
+    "dv/ace_dv_cache_cov_pkg.sv": "bab560bb29d96e95b7209dc1c4a79eba2712596cfc3683b1bc0d1a8b35cdcfc1",
+    "dv/ace_dv_checker_pkg.sv": "763b97d82028a85c379e782b70e41e2ba41ccd0022a3fa60b4150676573d241f",
+    "dv/ace_dv_model_pkg.sv": "793a50be3fe5490194916e70442ecccbbf3aaa18ae6c69d3fcd5bb3472f258ec",
+    "dv/ace_dv_runtime_cov_pkg.sv": "a0d65b4bd1d2c6478a81b7474c259ac602adef736104ee169c0734a95fd35bff",
+    "dv/observe.svh": "2733d033ae371a94a91f896b8b8379507df0b5287698bec93a4c261f8b6a127a",
+    "dv/tb_top.sv": "3ffd9c20d6edd22007ae5d3d4ace68e64c827fa382b3a26cc12c1bf89dfa0241"
+  },
+  "record_scope": "dv"
+}

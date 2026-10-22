@@ -34,7 +34,7 @@ ACE/APB 为 1 GHz；其他芯片时钟、复位、绑位与 DV 基线相同。�
 | ace_uvm_monitor.svh | 正沿保存握手和更新前缓存，1 ps 后保存更新后缓存；检查链路和允许的错误状态 |
 | ace_uvm_env.svh | scoreboard、coverage 和 env；连接两个 monitor 的 analysis port，检查闭合并保存结果 |
 | ace_uvm_sequences.svh | APB 配置、运行、停发、排空、暂停恢复、错误注入/清除/恢复和数据别名诊断的控制流程 |
-| ace_uvm_tests.svh | 九类测试及独立诊断的 factory 注册、objection、进度/总超时和最终 PASS 条件 |
+| ace_uvm_tests.svh | 十二类功能入口及独立诊断的 factory 注册、objection、进度/总超时和最终 PASS 条件 |
 | sim/filelist.f | 只编译本环境与 ACE/CLCI，不引用 DV |
 | sim/coverage_hierarchy.cfg | 代码覆盖范围只包括 u_master/module_a 与 u_slave/module_b |
 | sim/coverage_plan.json | 四组九点、44 个命名 bin 的报告字典 |
@@ -86,3 +86,12 @@ CR 判定和六项缓存覆盖使用真实缓存前后快照，不是全程独�
 checker 在真实握手时采样，coverage 组件只负责统一保存，不重复采样。控制台由脚本打印一次汇总表和未覆盖项，完整 bin/缓存证据另存。
 
 代码覆盖仅两个 ACE，统计窗口从零时刻包含复位、启动、流量、暂停和收尾。实时接口没有 branch 入口，显示 N/A；保留 coverage.vdb。两个不重叠实例可按分子分母合计；不同仿真不能从汇总数推算代码点并集。独立 `sim/merge_code_coverage.sh` 读取各运行 VDB 的位图做逐点 OR，生成基本块源码视图；适配范围、指标差异和目标验证状态见 [代码覆盖率说明](code_coverage.md)。
+
+
+## 缓存/CR定向补充
+
+新增 `ace_v2_uc_rs_sc_test`、`ace_v2_cr_unique_test`、`ace_v2_cr_shared_test`。控制序列只通过APB建立状态；读取真实cache、Home directory/memory快照仅用于检查，不能反向修改DUT。CR16用Home固有轮转产生ReadOnce，CR8由完成RS/IsShared后的SC接收ReadShared产生，UC→SC由UC接收ReadShared并收到CR24证明。
+
+`idle_hw`允许在没有在途事务时保留有效目录，供Home关闭的前置状态建立使用；原有`quiet_hw`仍额外要求目录无有效项，普通结束条件没有放宽。各Home阶段核对一次AC、一次指定CR、无CD及指定结束状态，定向结束仍走原有严格关闭检查。
+
+`cache`回归三项，`coverage`回归25项。目标bin命中和零冲突只是对应隔离场景的证据，不代表[RTL审核](rtl_review.md)中的并发排序和miss问题已经修复。新旧验证环境校验值不兼容，按运行说明分开保存输出。

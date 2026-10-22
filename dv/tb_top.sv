@@ -446,6 +446,158 @@ assign die1.RX_CLK_N    = die0.TX_CLK_N;
     end
     fail_test("DRAIN_TIMEOUT: queues/ACKs/Home directory did not close");
   endtask
+  // Read-only phase closure: a valid Home directory entry is allowed here.
+  function automatic bit phase_quiet();
+    return link_ready() && src_valid===10'b0 && dst_valid===10'b0 && checks.empty() &&
+      u_master.st==u_master.M_IDLE && u_master.sn==u_master.S_IDLE &&
+      u_slave.st==u_slave.B_IDLE && (u_slave.hs==u_slave.H_IDLE || u_slave.hs==u_slave.H_GAP) &&
+      u_slave.aw_pend===1'b0 && u_slave.ar_pend===1'b0 &&
+      u_master.o_cnt_tx===32'(checks.requests) &&
+      u_slave.o_cnt_wr===32'(checks.writes) && u_slave.o_cnt_rd===32'(checks.reads);
+  endfunction
+  task automatic settle_phase();
+    int stable;
+    stable=0;
+    for(int n=0;n<drain_timeout_cycles;n++) begin
+      @(negedge ace_clk);
+      if(phase_quiet()) stable++;else stable=0;
+      if(stable==16) return;
+    end
+    fail_test("DIRECTED_PHASE_TIMEOUT: main responses/ACKs or snoop did not close");
+  endtask
+  task automatic expect_line(input logic [1:0] expected_state,input string label_text);
+    int slot;
+    logic [127:0] expected;
+    slot=int'(base_argument[5:4]);
+    expected=expected_data(base_argument[43:0],3'(data_mode),8'(prbs_code),8'(xcode));
+    if(u_master.c_valid[slot]!==1'b1 || u_master.c_tag[slot]!==base_argument[43:4] ||
+       u_master.c_state[slot]!==expected_state || u_master.c_data[slot]!==expected ||
+       u_slave.dir_valid[slot]!==1'b1 || u_slave.dir_tag[slot]!==base_argument[43:4] ||
+       u_slave.dir_state[slot]!==expected_state || u_slave.mem_written[slot]!==1'b1 ||
+       u_slave.mem_tag[slot]!==base_argument[43:4] || u_slave.mem[slot]!==expected)
+      fail_test({"DIRECTED_STATE_DATA: ",label_text});
+    for(int n=0;n<4;n++)
+      if(n!=slot && (u_master.c_valid[n]!==1'b0 || u_slave.dir_valid[n]!==1'b0))
+        fail_test("DIRECTED_STATE: unexpected second valid line");
+    $display("DV_DIRECTED_EVIDENCE phase=%s addr=%h state=%0d data=%032h requests=%0d WACK=%0d CR=%0d rotation=%0d",
+      label_text,base_argument[43:0],expected_state,expected,checks.requests,checks.nd[WACK],checks.nd[CR],u_slave.h_rot);
+  endtask
+  task automatic expect_invalid(input string label_text);
+    int slot;
+    logic [127:0] expected;
+    slot=int'(base_argument[5:4]);
+    expected=expected_data(base_argument[43:0],3'(data_mode),8'(prbs_code),8'(xcode));
+    if(u_master.c_data[slot]!==expected || u_slave.mem[slot]!==expected ||
+       u_slave.mem_written[slot]!==1'b1 || u_slave.mem_tag[slot]!==base_argument[43:4])
+      fail_test({"DIRECTED_INVALID_DATA: ",label_text});
+    if(u_master.c_valid[slot]!==1'b0 || u_slave.dir_valid[slot]!==1'b0)
+      fail_test({"DIRECTED_INVALID: ",label_text});
+    $display("DV_DIRECTED_EVIDENCE phase=%s addr=%h cache_valid=0 directory_valid=0 CR=%0d rotation=%0d",
+      label_text,base_argument[43:0],checks.nd[CR],u_slave.h_rot);
+  endtask
+  task automatic establish_uc();
+    longint unsigned first_request;
+    realtime limit_time;
+    int minimum_new,slot;
+    slot=int'(base_argument[5:4]);minimum_new=2;
+    stage="directed WU/WLU setup";
+    if(home_enabled) fail_test("DIRECTED_SETUP: Home must be disabled");
+    // APB disable can take effect after an additional accepted request.
+    // Check every real transaction, then retry if that last WU left no UC.
+    for(int attempt=0;attempt<8;attempt++) begin
+      first_request=checks.requests;
+      set_enable(0,1);limit_time=$realtime+run_timeout_us*1us;
+      while(checks.requests<first_request+minimum_new) begin
+        @(negedge ace_clk);
+        if($realtime>=limit_time) fail_test("DIRECTED_SETUP_TIMEOUT");
+      end
+      set_enable(0,0);settle_phase();
+      if(checks.reads!=0 || checks.writes!=checks.requests)
+        fail_test("DIRECTED_SETUP: unexpected read traffic");
+      if(u_master.c_valid[slot] && u_master.c_state[slot]===ST_UC) begin
+        expect_line(ST_UC,"UC established after WU/WLU and all ACKs");
+        return;
+      end
+      if(u_master.c_valid[slot]!==1'b0 || u_slave.dir_valid[slot]!==1'b0)
+        fail_test("DIRECTED_SETUP: unexpected state after a closed single-write phase");
+      minimum_new=1;
+    end
+    fail_test("DIRECTED_SETUP: could not stop on WLU/UC within eight APB phases");
+  endtask
+  task automatic wait_home_cr(input longint unsigned required);
+    realtime limit_time;
+    limit_time=$realtime+run_timeout_us*1us;
+    while(checks.nd[CR]<required) begin
+      @(negedge ace_clk);
+      if($realtime>=limit_time) fail_test("DIRECTED_HOME_TIMEOUT");
+    end
+  endtask
+  task automatic directed_cache_case();
+    longint unsigned previous_goal,first_read_request;
+    realtime limit_time;
+    int slot;
+    slot=int'(base_argument[5:4]);
+    // The long gap reserves a control window to disable Home through APB.
+    // Snoop types still come entirely from the unmodified Home rotation.
+    snoop_gap=255;
+    stage="directed APB configuration";configure_agents(1);
+    establish_uc();
+    if(test_name=="cr_shared") begin
+      // The directory already owns UC. A normal ReadShared therefore gets
+      // R.IsShared and registers SC before Home is allowed to issue anything.
+      stage="directed SC setup via ReadShared";configure_agents(2);
+      first_read_request=checks.requests;
+      set_enable(0,1);limit_time=$realtime+run_timeout_us*1us;
+      while(checks.requests<first_read_request+1) begin
+        @(negedge ace_clk);
+        if($realtime>=limit_time) fail_test("DIRECTED_SHARED_SETUP_TIMEOUT");
+      end
+      set_enable(0,0);settle_phase();
+      // An accepted same-line supplemental RS also leaves the line SC.
+      // Advancing to the later RU/address is outside this controlled setup.
+      if(!(checks.reads inside {1,2}) || checks.categories[1]!=checks.reads ||
+         checks.hits[1][2]!=checks.reads || checks.hits[6][2]!=checks.reads ||
+         checks.hits[8][3]!=checks.reads)
+        fail_test("DIRECTED_SHARED_SETUP: expected one or two fully checked same-line ReadShared transactions");
+      expect_line(ST_SC,"ReadShared R.IsShared established SC before Home");
+    end
+    if(u_slave.h_rot!==2'd0) fail_test("DIRECTED_SETUP: initial Home rotation is not RS");
+    previous_goal=checks.hits[8][4];
+    stage="directed Home ReadShared";set_enable(1,1);
+    wait_home_cr(1);settle_phase();
+    expect_line(ST_SC,"Home ReadShared retained correct data as SC");
+    if(test_name=="cr_shared") begin
+      if(checks.hits[5][1]!=1 || checks.hits[8][4]!=previous_goal ||
+         checks.cache_observer.attempted[4]!=0)
+        fail_test("DIRECTED_COVERAGE: SC ReadShared requires CR8 and must not claim UC_RS_SC");
+    end else if(checks.hits[8][4]!=previous_goal+1 || checks.hits[5][3]!=1 ||
+       checks.cache_observer.attempted[4]!=1 || checks.cache_observer.conflict[4]!=0 ||
+       checks.cache_observer.not_matched(4)!=0)
+      fail_test("DIRECTED_COVERAGE: UC_RS_SC requires CR24, one matched transition and zero conflicts");
+    // Let the following MakeInvalid remove the line before refilling it.
+    stage="directed SC MakeInvalid";wait_home_cr(2);set_enable(1,0);settle_phase();
+    expect_invalid("SC MakeInvalid completed");
+    if(u_slave.h_rot!==2'd2 || checks.nd[CR]!=2 || checks.hits[4][0]!=1 || checks.hits[4][1]!=1 || checks.hits[5][0]!=1)
+      fail_test("DIRECTED_ROTATION: expected RS then MI");
+    if(test_name=="cr_unique") begin
+      establish_uc();
+      stage="directed UC CleanInvalid";set_enable(1,1);wait_home_cr(3);
+      set_enable(1,0);settle_phase();expect_invalid("UC CleanInvalid completed");
+      if(u_slave.h_rot!==2'd3 || checks.nd[CR]!=3 || checks.hits[4][2]!=1 || checks.hits[5][0]!=2)
+        fail_test("DIRECTED_ROTATION: expected CI before RO");
+      establish_uc();
+      stage="directed UC ReadOnce";set_enable(1,1);wait_home_cr(4);
+      set_enable(1,0);settle_phase();expect_invalid("UC ReadOnce completed");
+      if(checks.hits[5][2]!=1 || checks.hits[4][3]!=1 || checks.nd[CR]!=4 || u_slave.h_rot!==2'd0)
+        fail_test("DIRECTED_COVERAGE: UC ReadOnce must deliver exactly one CR16");
+    end
+    if(checks.ns[CD]!=0 || checks.nd[CD]!=0) fail_test("DIRECTED_CLEAN: clean line unexpectedly returned CD");
+    tx_target=(test_name=="cr_unique")?6:((test_name=="cr_shared")?3:2);
+    if(checks.requests<tx_target) fail_test("DIRECTED_COUNT: insufficient completed setup requests");
+    drain();
+    $display("DV_DIRECTED_PASS test=%s UC_RS_SC=%0d CR16=%0d CR8=%0d conflicts=%0d completed=%0d",
+      test_name,checks.hits[8][4],checks.hits[5][2],checks.hits[5][1],checks.cache_observer.conflict[4],checks.requests);
+  endtask
   task automatic check_apb_results();
     transfer(0,0,12'h010,0,status_a);transfer(1,0,12'h010,0,status_b);
     if(status_a!==0 || status_b!==0) fail_test("Nonzero APB error status");
@@ -487,7 +639,7 @@ assign die1.RX_CLK_N    = die0.TX_CLK_N;
     void'($value$plusargs("SNOOP_GAP=%d",snoop_gap));void'($value$plusargs("LINK_TIMEOUT_US=%d",link_timeout_us));
     void'($value$plusargs("RUN_TIMEOUT_US=%d",run_timeout_us));void'($value$plusargs("GLOBAL_TIMEOUT_US=%d",global_timeout_us));
     void'($value$plusargs("DRAIN_TIMEOUT_CYC=%d",drain_timeout_cycles));void'($value$plusargs("PROGRESS_US=%d",progress_us));
-    if(!(test_name inside {"apb","smoke","burst_boundary"}) || data_mode<0 || data_mode>5 ||
+    if(!(test_name inside {"apb","smoke","burst_boundary","uc_rs_sc","cr_unique","cr_shared"}) || data_mode<0 || data_mode>5 ||
        burst_beats<2 || burst_beats>256 || tx_target<1 || tx_target>100000 ||
        !(direction inside {"write","read"}) || base_argument[63:44]!=0 || base_argument[3:0]!=0 ||
        prbs_code<0 || prbs_code>255 || xcode<0 || xcode>255 || snoop_gap<0 || snoop_gap>255 ||
@@ -507,6 +659,7 @@ assign die1.RX_CLK_N    = die0.TX_CLK_N;
     $display("DV_LINK_READY t=%0t complete links stable for eight ACE cycles",$time);
     checking=1;
     if(test_name=="apb") begin apb_case();tx_target=0;end
+    else if(test_name inside {"uc_rs_sc","cr_unique","cr_shared"}) directed_cache_case();
     else begin
       scenario=(test_name=="smoke")?0:((direction_number==0)?3:4);
       stage="APB configuration";configure_agents(scenario);

@@ -17,3 +17,5 @@ bash dv/sim/merge_code_coverage.sh
 `tb_top.sv` 放置芯片和 ACE、配置 APB、控制流程；`observe.svh` 被动观察真实链路的两端。
 模型、缓存行为覆盖、原生代码覆盖查询和严格对账分别在四个 `ace_dv_*_pkg.sv` 文件中。
 `sim/` 收纳运行工具与编译/覆盖配置；结果自动写入本环境自己的 `out/`。
+
+新增缓存/CR定向用例：`bash dv/sim/regression.sh cache`；完整功能覆盖回归：`bash dv/sim/regression.sh coverage`（25次）。本批新增验证源码与历史输出的版本校验值不同，运行前的输出归档和具体流程见对应运行说明。RTL审核见 [rtl_review.md](../docs/rtl_review.md)。

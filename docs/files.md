@@ -46,6 +46,14 @@
 
 脚本复用各自原有 `report.py` 的严格检查，自动跳过未通过或未结束的运行；UVM 错误注入和诊断结果各自单列。功能覆盖按 bin 合并，代码覆盖保持各次列出。更新两套 README 和运行说明。ACE/CLCI 源码、验证组件、覆盖计划和原报告器保持不变；临时测试与样例输出不收录。
 
+
+## 2026-10-22 缓存/CR补充范围
+
+- DV更新`tb_top.sv`、`sim/run.py`、`sim/regression.sh`。
+- UVM更新`ace_uvm_if.sv`、`observe.svh`、`ace_uvm_pkg.sv`、`ace_uvm_sequences.svh`、`ace_uvm_tests.svh`、`sim/run.py`、`sim/regression.sh`。
+- 新增`docs/rtl_review.md`；更新两套运行/设计说明、测试与覆盖说明、检查记录、历史验证JSON的本批条目、两套README和根README。
+- 新测试通过APB配置，新增DUT内部连接均只读。ACE/CLCI、checker、cache覆盖观察器和44bin计划不变。实验/适配代码和运行输出不收录。
+
 ## 全部交付文件
 
 代码覆盖率新增独立的 `dv/sim/merge_code_coverage.py`、`dv/sim/merge_code_coverage.sh`、`uvm/sim/merge_code_coverage.py` 和 `uvm/sim/merge_code_coverage.sh`，各自只读本环境 VDB，报告保存在各自的 `out/code_coverage/`。新增 `docs/code_coverage.md`，更新两套 README、运行说明、根 README 和检查记录。源码和仿真组件不变；合成测试、样例 VDB、校准源码及日志继续留在工程外。
@@ -55,7 +63,7 @@
 | 路径 | SHA-256 |
 |---|---|
 | `.gitignore` | c231e433eb5690dbbbf32d146e22e21d88ba1e777dc31b763c909f159da8b078 |
-| `README.md` | 85f05503d8c54914d19a14926f4b0ba6fce82296cc2ee2f0161b1c2f2deaa565 |
+| `README.md` | ccd100aa361c7786c1d2017a91b0987d492d54df4b83131e56dbf80a23f7793d |
 | `ace/ace_funcs.svh` | 3e3aba622f0e602b44127d56e7fafc74656de6dbb06cdb26938a8dc8970ddb58 |
 | `ace/ace_pkg.sv` | f18c24bd8e73f130b67e377cf9cec5efe3b1489cd06511e0631d4344cafea71f |
 | `ace/module_a.sv` | b34cff86db0aab09f287f6b1e569062ec84e8ff9cbcbc35fc3f85b46a628da29 |
@@ -87,20 +95,21 @@
 | `clci/rtl/clci_sphy_all.v` | 003d0a3eeac13c6471c054e62b8c74d225dd3abbec8d93968e5704e922c6e0e3 |
 | `clci/rtl/clci_subsys_wo_sphy.v` | 2ce3908166de6cbd340880e93c753e4d2a155a39a048530313c633c1ec8a24f2 |
 | `clci/rtl/define_bmx_ace128.v` | 8decde59b16f50d60fddd55fdd05b6c102bc4f86d9e40179c3c5eeb3b9173f9a |
-| `docs/KNOWN_ISSUES.md` | 317f52a0b4f944d3e858e9e2c5a8979db0573f9cdca30e333d21097de6c40609 |
-| `docs/VALIDATION.md` | 5528e3c35470d337e31e92e66ed9931b3d15bc410fcaabc4417fdd1c7557a5f2 |
+| `docs/KNOWN_ISSUES.md` | 17a220a1a901254fc76ccea8a859fc7353be60013ac8d6beeb6a122f9264d9f5 |
+| `docs/VALIDATION.md` | 750908ec3a400e7eeccd8b4d32b84c963481cac42cc0e8feafafe999bacdd4ba |
 | `docs/code_coverage.md` | 62b1b0de035a1882997d8d012296ed0b1844a00d62cb789adf27692fe590b1b3 |
-| `docs/design.md` | 024814a87bd6cb9fb44d2a6cdf5dc4c9f62dbdbc8041690e081c0b964ec2174a |
+| `docs/design.md` | 23e44e25ad33cb030a6bb66109e20a449552d6a46a5ad9ed43a0c1f91f80c49a |
 | `docs/files.md` | 本文件不自校验 |
-| `docs/functional_coverage.md` | 2ef7e4c13a5c6e47cd7ada88e2eb38b764432218a17430821e80dcd35df66f36 |
+| `docs/functional_coverage.md` | a92d8a1682e9d95bd907da960e251734a3456e89d4204c4f9dc14c982bb60d83 |
+| `docs/rtl_review.md` | a74b37f4e95b7a870f2998c41d93d1eea1d1cf30610ebd8d1ef9481e21848a09 |
 | `docs/source_manifest.json` | b739ca55ab8716d928b145f4b952ef379ff8884cb5e0c99f6f13e06b03a4cd10 |
-| `docs/test_plan.md` | 9627e776377dfb992ab69c3bcfc5e1d20c3dada93257f137e4d1ca46f201a140 |
-| `docs/user_guide.md` | 6376c570414ad2f42e94258aea80af4d44f0072e17f836ed376749f04573b0c7 |
-| `docs/uvm_design.md` | 5130ac7d259d1ff9b8f17783f06fdf781a6f28ecd7f6fbf3946bc3e7bc0aa440 |
-| `docs/uvm_user_guide.md` | 1351c833c44455f39b216d44c7a238012b2cd22142e9a1ff75eb55307b33bc73 |
-| `docs/uvm_validation_summary.json` | ccc0620b46de0e43fdd03e5a82ee48f69f03a9b634310f5a34a089165d465fb7 |
-| `docs/validation_summary.json` | ed0a5b6574eac77266cbd538b2ad90b34bed002ddac6ff1d57b3f1dc574b40b6 |
-| `dv/README.md` | 09851911561663aeb980425d5d1ad6958173dcc33d92577f1c6980925ce99cc4 |
+| `docs/test_plan.md` | 0e1d8a0b55a7b2358d7fad12006d6d5b4830d8aa2d6035f683f0cc3eeff8082f |
+| `docs/user_guide.md` | ba319a1d7d3c8033b68da0d2f95decfc5d5782dee98f968f5ac1678653df7afa |
+| `docs/uvm_design.md` | 1b628b9b25e8935e60f0ebd4813d35a6664b5c25e07f1a8b8407f8f3b7cbce4c |
+| `docs/uvm_user_guide.md` | 7f1e76becf0f5849f1f03e4888a5915760b55f2dec41bec7d425795234389e80 |
+| `docs/uvm_validation_summary.json` | 56be891cd38080a30232f2cbed5f238a6cb0374c5878b1338b4c393f68dacebd |
+| `docs/validation_summary.json` | c89742a83c423a8116d065db3739dc74600d3bb7519c801a0cd781bf82ccd218 |
+| `dv/README.md` | da9d9e83b8859886c833dde190aedc52ab7b33856b2b8f8131ae833afb19af58 |
 | `dv/ace_dv_cache_cov_pkg.sv` | bab560bb29d96e95b7209dc1c4a79eba2712596cfc3683b1bc0d1a8b35cdcfc1 |
 | `dv/ace_dv_checker_pkg.sv` | 763b97d82028a85c379e782b70e41e2ba41ccd0022a3fa60b4150676573d241f |
 | `dv/ace_dv_model_pkg.sv` | 793a50be3fe5490194916e70442ecccbbf3aaa18ae6c69d3fcd5bb3472f258ec |
@@ -114,24 +123,24 @@
 | `dv/sim/merge_code_coverage.sh` | 37f9474d131e71467a9b8e0ce8bf30e84a0989a8cfca36ec1a8c3d9a7b07b5af |
 | `dv/sim/merge_coverage.py` | 770dad8949f79554f6331949214e18c09a78ec65e4ee1efc8c4b82549689206f |
 | `dv/sim/merge_coverage.sh` | 614e6a182f466c4dd7bc475eda8cb06546d20df2039c75d22102844308c32cd1 |
-| `dv/sim/regression.sh` | 7158ef67da60fad5eab42ccfd2f2373113d527a43afd24435f865a4caa6b0d2a |
+| `dv/sim/regression.sh` | 0c359ef0878915ab6a786382cf44a9754b136906ebe2a583fd800017df9ae040 |
 | `dv/sim/report.py` | 6b91613dfa9af500f8fb8714e114944b6f90affd6f4aeb7bf11577b60da86eb6 |
-| `dv/sim/run.py` | a087e1f45035fa62caac83b979911889079d04352bbdf4ebac209a985dd57b31 |
+| `dv/sim/run.py` | 0e5908cd57ec2a6a2bfec8363b4108229c1694bb63e013670c92effe22a98858 |
 | `dv/sim/run.sh` | 0976aea283381c74191735fd0ed50fe16cda5c8a0808405226cc04305f64e4b0 |
-| `dv/tb_top.sv` | 3ffd9c20d6edd22007ae5d3d4ace68e64c827fa382b3a26cc12c1bf89dfa0241 |
-| `uvm/README.md` | b8e9636c6392de9c6ec7290cc633fa33686c28acfe9a5405b147a5edfbe19e7e |
+| `dv/tb_top.sv` | 8523b57006766bb5e50edd3968a51b36b809ffcabc00914efb24cf90fd4cb579 |
+| `uvm/README.md` | 3e096881364cb97291e5a400ec3a2290cff60931a8a65290f0f57af22ca299c1 |
 | `uvm/ace_uvm_apb.svh` | b2ac77a543642ab054720f82789fe15032f3ea2370b9f660b91f883526116623 |
 | `uvm/ace_uvm_cache_cov_pkg.sv` | b038c3e65735d9f06d5ea3c55d0d19f4e2837dd2327e8720b8e119d4cf990e09 |
 | `uvm/ace_uvm_checker_pkg.sv` | d4ee99c5ab5243df0eefc694b6d5d7e667d04d5eb6a055ccabfee9f837c3048b |
 | `uvm/ace_uvm_env.svh` | 8e52d15e1aa4c3bad524fac26f26543da92735168ed327c2e4dcb60d570db26d |
-| `uvm/ace_uvm_if.sv` | 666cc849f100bed637f0f418466e48b6ab5805af90db50d6a3408768a06aaeac |
+| `uvm/ace_uvm_if.sv` | cbd150315bcbef52d0eea2528f9b9c96fa355de54ff3b8a0ba989a3deafe5834 |
 | `uvm/ace_uvm_model_pkg.sv` | c93b988af6e5251e59a9157c6198ea0620d649f21fcec8b4bf3f0ccfb92b928c |
 | `uvm/ace_uvm_monitor.svh` | e5ef626545fdb37ffd071f2d32366506b2a73a801f2dee8f8dbee0956cda72f0 |
-| `uvm/ace_uvm_pkg.sv` | f8002af79f5a77dedabac55c33ac6f5da704869190c8f03096f4f9af24b3a73a |
+| `uvm/ace_uvm_pkg.sv` | 5fc4daab344c7206c9910e35cca6d3c6e422cae5f1d638e40902e11f3a604c00 |
 | `uvm/ace_uvm_runtime_cov_pkg.sv` | bdace1f74d6920875c84be5e4b162bf15ffa51220243d9c0ffb96a082432db0f |
-| `uvm/ace_uvm_sequences.svh` | ebcebc38c322b2b90ffded046159ba6d7df6e79f901057c4946eb6974208c434 |
-| `uvm/ace_uvm_tests.svh` | d002e7495a37bfc2359800f9335ef20cf45724bd991102fa1eb9014556a84132 |
-| `uvm/observe.svh` | 8deda556fefbb9e93b22b0de4884adbe1e9d06ed958e0ebb42fd7a1f06a81e5c |
+| `uvm/ace_uvm_sequences.svh` | f035ed4d24d838904de35b82a23c6eae9bf6618f345fc0b916707c5ba4412987 |
+| `uvm/ace_uvm_tests.svh` | e0e2613361de1fef3a0eea8390a34ca6f89cf76279e357517aea151e4d05aa84 |
+| `uvm/observe.svh` | a7cf8e07a864f3d416bc4b9da19b11fab3426968fe217fb55d68fee4b2ad16b3 |
 | `uvm/sim/check_project.py` | 6903ff9481b0f26dad14aebb6ebc16a8319310f831023b8d7c87e1d065af4517 |
 | `uvm/sim/coverage_hierarchy.cfg` | 61cf194ee3cf92e7a0e40fac7d993a554763a1d27c3fbf869aa5137fd075f8a1 |
 | `uvm/sim/coverage_plan.json` | fe49c4d3a99cd36c36394e29c0b92ef2dfae7124485a0837bed280b87d7186e9 |
@@ -140,12 +149,12 @@
 | `uvm/sim/merge_code_coverage.sh` | 37f9474d131e71467a9b8e0ce8bf30e84a0989a8cfca36ec1a8c3d9a7b07b5af |
 | `uvm/sim/merge_coverage.py` | 5b7c38c063389df512ca81991555bc221f7c3094ade5cf12a97d984bed002d26 |
 | `uvm/sim/merge_coverage.sh` | 614e6a182f466c4dd7bc475eda8cb06546d20df2039c75d22102844308c32cd1 |
-| `uvm/sim/regression.sh` | 4ec1473d2253cdb364e505e4fbe6214ac7662b5fe78d161eb91eb6a55aa2e043 |
+| `uvm/sim/regression.sh` | cc035485a6b6ef10f599412257d1bd704d68a44d1fd0b3670d70a612a31d3507 |
 | `uvm/sim/report.py` | e7338b5f86b5ad1bd87021909fa11ddb3baae36aa54b7afd0d4733f62d98a10a |
-| `uvm/sim/run.py` | 02cfe184fe931ad49c4f8e684284cde8097ec783942f4986ae69d3f4119cb337 |
+| `uvm/sim/run.py` | 9a6f4e906226e85dd151169ec230c84cb4f398853c34482d65457a8df4cc158c |
 | `uvm/sim/run.sh` | 0976aea283381c74191735fd0ed50fe16cda5c8a0808405226cc04305f64e4b0 |
 | `uvm/tb_top.sv` | 50bc77f7e75a327e39d15ffc33cfc127ab8a7ac5d3396c16c821e5b3fe869296 |
 
-共91份文件。
+共92份文件。
 
 不收录：旧ACE、旧外部订单UVM、简化链路、VIP示例、历史输出/波形、旧补丁包、VCS/UVM工具安装、本地验证适配器和静态桩。厂商版权保持。

@@ -146,12 +146,148 @@ class ace_v2_control_sequence extends uvm_sequence#(ace_v2_apb_item);
     // The checker uses stored beat-1 data. A's own beat-0 expectation must
     // still be checked; disagreement remains an actual failing diagnostic.
   endtask
+  // These two cases deliberately separate state construction from snoops.
+  // All requests still come from the ACE generator and traverse real CLCI.
+  task drain_idle();
+    int stable;stable=0;
+    for(int n=0;n<cfg.drain_cycles;n++) begin
+      @(negedge cfg.vif.clk);
+      if(cfg.vif.idle_hw===1'b1 && cfg.engine.empty() &&
+         cfg.vif.cnt_tx===32'(cfg.engine.requests-cfg.epoch_tx) &&
+         cfg.vif.cnt_wr===32'(cfg.engine.writes-cfg.epoch_wr) &&
+         cfg.vif.cnt_rd===32'(cfg.engine.reads-cfg.epoch_rd)) stable++;else stable=0;
+      if(stable==16) return;
+    end
+    `uvm_fatal("DIRECTED_DRAIN","ACE/link data, response and ACK queues did not close")
+  endtask
+  task line_expect(input bit valid,input logic [1:0] state);
+    int slot;logic [127:0] data_expected;
+    slot=internal_cache_slot(cfg.base_address);
+    data_expected=expected_data(cfg.base_address,3'(cfg.mode),8'(cfg.prbs_code),8'(cfg.xcode));
+    for(int n=0;n<4;n++) begin
+      if(n!=slot && (cfg.vif.cache[n].valid!==1'b0 || cfg.vif.directory_valid[n]!==1'b0))
+        `uvm_fatal("DIRECTED_STATE","Unexpected valid cache/directory entry outside the target line")
+    end
+    if(cfg.vif.cache[slot].valid!==valid || cfg.vif.directory_valid[slot]!==valid)
+      `uvm_fatal("DIRECTED_STATE",$sformatf("valid expected=%b cache=%b directory=%b",valid,cfg.vif.cache[slot].valid,cfg.vif.directory_valid[slot]))
+    if(valid && (!internal_cache_has(cfg.vif.cache[slot],cfg.base_address,state) ||
+       cfg.vif.directory_tag[slot]!==cfg.base_address[43:4] || cfg.vif.directory_state[slot]!==state ||
+       cfg.vif.cache[slot].data!==data_expected))
+      `uvm_fatal("DIRECTED_STATE","Cache state/tag/data or Home directory differ from the required line")
+    if(cfg.vif.memory_written[slot]!==1'b1 || cfg.vif.memory_tag[slot]!==cfg.base_address[43:4] ||
+       cfg.vif.memory_data[slot]!==data_expected)
+      `uvm_fatal("DIRECTED_DATA","Home memory lost the completed single-write data")
+  endtask
+  task establish_uc();
+    longint unsigned target,prior_wlu;realtime deadline;
+    int slot;
+    if(cfg.a_enable || cfg.b_enable) `uvm_fatal("DIRECTED_CONTROL","Generators must be disabled before UC setup")
+    slot=internal_cache_slot(cfg.base_address);prior_wlu=cfg.engine.hits[1][1];
+    cfg.stage="directed: establish UC with Home disabled";
+    for(int attempt=0;attempt<8;attempt++) begin
+      // APB stop is not an exact request-count limiter. Close every accepted
+      // write, then inspect its result; a final WU needs another WLU attempt.
+      target=cfg.engine.requests+((attempt==0)?2:1);
+      enable(0,1);deadline=$realtime+cfg.run_timeout_us*1us;
+      while(cfg.engine.requests<target) begin
+        @(negedge cfg.vif.clk);
+        if($realtime>=deadline) `uvm_fatal("DIRECTED_RUN","Single-write UC setup did not reach the request lower bound")
+      end
+      enable(0,0);drain_idle();check_status();check_counts();
+      if(internal_cache_has(cfg.vif.cache[slot],cfg.base_address,ST_UC)) begin
+        line_expect(1,ST_UC);
+        if(cfg.engine.hits[1][1]<=prior_wlu) `uvm_fatal("DIRECTED_STATE","UC setup did not include a real WLU handshake")
+        $display("UVM_ACE_DIRECTED_UC requests=%0d writes=%0d attempts=%0d",cfg.engine.requests,cfg.engine.writes,attempt+1);
+        return;
+      end
+      line_expect(0,ST_I);
+    end
+    `uvm_fatal("DIRECTED_STATE","APB stop never left a completed WLU/UC state within eight attempts")
+  endtask
+  task home_step(input int type_bin,response_bin,input bit valid_after,input logic [1:0] state_after);
+    longint unsigned prior_ac,prior_cr,prior_type,prior_resp,prior_cd;realtime deadline;
+    prior_ac=cfg.engine.ns[AC];prior_cr=cfg.engine.nd[CR];prior_type=cfg.engine.hits[4][type_bin];
+    prior_resp=cfg.engine.hits[5][response_bin];prior_cd=cfg.engine.nd[CD];
+    cfg.stage=$sformatf("directed: Home rotation %0d",type_bin);
+    if(cfg.vif.home_rotation!==2'(type_bin) || cfg.a_enable || cfg.b_enable)
+      `uvm_fatal("DIRECTED_ROTATION","Unexpected Home rotation or enabled generator at phase entry")
+    enable(1,1);deadline=$realtime+cfg.run_timeout_us*1us;
+    while(cfg.engine.nd[CR]==prior_cr) begin
+      @(negedge cfg.vif.clk);
+      if($realtime>=deadline) `uvm_fatal("DIRECTED_SNOOP","Expected Home snoop/CR did not complete")
+    end
+    // The controlled gap leaves time for this APB stop before another AC.
+    enable(1,0);drain_idle();check_status();check_counts();
+    if(cfg.engine.ns[AC]!=prior_ac+1 || cfg.engine.nd[CR]!=prior_cr+1 ||
+       cfg.engine.hits[4][type_bin]!=prior_type+1 || cfg.engine.hits[5][response_bin]!=prior_resp+1 ||
+       cfg.engine.nd[CD]!=prior_cd)
+      `uvm_fatal("DIRECTED_SNOOP","Phase did not deliver exactly the planned AC and matching clean CR without CD")
+    line_expect(valid_after,state_after);
+    $display("UVM_ACE_DIRECTED_HOME type_bin=%0d response_bin=%0d cache_valid=%b state=%0d AC=%0d CR=%0d",
+      type_bin,response_bin,valid_after,state_after,cfg.engine.ns[AC],cfg.engine.nd[CR]);
+  endtask
+  task coverage_case(input bit need_unique);
+    if(cfg.snoop_gap!=255) `uvm_fatal("DIRECTED_ARGS","Coverage cases require SNOOP_GAP=255 for bounded APB phase isolation")
+    configure(1);establish_uc();
+    home_step(0,3,1,ST_SC); // UC + ReadShared -> CR24 and retained SC.
+    if(cfg.engine.hits[8][4]!=1 || cfg.engine.cache_observer.attempted[4]!=1 ||
+       cfg.engine.cache_observer.matched[4]!=1 || cfg.engine.cache_observer.conflict[4]!=0 ||
+       cfg.engine.cache_observer.not_matched(4)!=0)
+      `uvm_fatal("DIRECTED_COVERAGE","UC_RS_SC requires one proved hit with zero conflict/unmatched attempts")
+    // Retire the retained SC copy via the next MakeInvalid, preserving the
+    // proven transition and closing the directory before final checks.
+    home_step(1,0,0,ST_I);
+    if(need_unique) begin
+      establish_uc();home_step(2,0,0,ST_I); // CleanInvalid advances rotation.
+      establish_uc();home_step(3,2,0,ST_I); // UC + ReadOnce -> CR16.
+      if(cfg.engine.hits[5][2]!=1) `uvm_fatal("DIRECTED_COVERAGE","CR16 was not delivered exactly once")
+    end
+    if(cfg.engine.reads!=0 || cfg.engine.cache_observer.correlation_errors!=0)
+      `uvm_fatal("DIRECTED_COVERAGE","Directed setup emitted reads or lost event correlation")
+    for(int g=0;g<6;g++)
+      if(cfg.engine.cache_observer.conflict[g]!=0 || cfg.engine.cache_observer.not_matched(g)!=0)
+        `uvm_fatal("DIRECTED_COVERAGE","An observed cache behavior was conflicting or unmatched")
+    total_min=need_unique?6:2;
+    $display("UVM_ACE_DIRECTED_COVERAGE_PASS target=%s CR16=%0d UC_RS_SC=%0d conflicts=%0d correlation_errors=%0d",
+      need_unique?"CR16":"UC_RS_SC",cfg.engine.hits[5][2],cfg.engine.hits[8][4],
+      cfg.engine.cache_observer.conflict[4],cfg.engine.cache_observer.correlation_errors);
+  endtask
+  task shared_case();
+    longint unsigned prior_requests,prior_reads,prior_shared;realtime deadline;
+    configure(1);establish_uc();configure(2);
+    prior_requests=cfg.engine.requests;prior_reads=cfg.engine.reads;prior_shared=cfg.engine.hits[6][2];
+    cfg.stage="directed: ReadShared retains a clean shared line";
+    enable(0,1);deadline=$realtime+cfg.run_timeout_us*1us;
+    while(cfg.engine.reads==prior_reads) begin
+      @(negedge cfg.vif.clk);
+      if($realtime>=deadline) `uvm_fatal("DIRECTED_RUN","Single ReadShared setup did not issue")
+    end
+    enable(0,0);drain_idle();check_status();check_counts();line_expect(1,ST_SC);
+    // At most the generator's supplementary ReadShared can enter before stop.
+    if(cfg.engine.reads-prior_reads<1 || cfg.engine.reads-prior_reads>2 ||
+       cfg.engine.requests-prior_requests!=cfg.engine.reads-prior_reads ||
+       cfg.engine.hits[6][2]-prior_shared!=cfg.engine.reads-prior_reads)
+      `uvm_fatal("DIRECTED_STATE","SC setup must contain only one/two actual ReadShared responses with IsShared")
+    home_step(0,1,1,ST_SC);home_step(1,0,0,ST_I);
+    if(cfg.engine.hits[5][1]!=1 || cfg.engine.hits[8][3]==0 || cfg.engine.hits[8][4]!=0 ||
+       cfg.engine.cache_observer.correlation_errors!=0)
+      `uvm_fatal("DIRECTED_COVERAGE","CR8/RS_IS_SC evidence missing or a UC_RS_SC hit was falsely attributed")
+    for(int g=0;g<6;g++)
+      if(cfg.engine.cache_observer.conflict[g]!=0 || cfg.engine.cache_observer.not_matched(g)!=0)
+        `uvm_fatal("DIRECTED_COVERAGE","Shared setup has a conflicting or unmatched cache observation")
+    total_min=3;
+    $display("UVM_ACE_DIRECTED_COVERAGE_PASS target=CR8 CR8=%0d RS_IS_SC=%0d UC_RS_SC=%0d correlation_errors=%0d",
+      cfg.engine.hits[5][1],cfg.engine.hits[8][3],cfg.engine.hits[8][4],cfg.engine.cache_observer.correlation_errors);
+  endtask
   task body();
     int scenario;
     if(cfg==null) `uvm_fatal("CFG","Sequence has no configuration")
     wait_link();
     case(cfg.kind)
       "ace_v2_apb_test":apb_case();
+      "ace_v2_uc_rs_sc_test":coverage_case(0);
+      "ace_v2_cr_shared_test":shared_case();
+      "ace_v2_cr_unique_test":coverage_case(1);
       "ace_v2_pause_resume_test":pause_case();
       "ace_v2_error_status_test":error_case();
       "ace_v2_data_alias_diag_test":alias_diagnostic();

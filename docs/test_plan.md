@@ -171,3 +171,12 @@ Normal mixed 并不保证 WLU；由定向单拍写测试覆盖。并行下 RS �
   https://developer.arm.com/-/media/Arm%20Developer%20Community/PDF/IHI0022H_amba_axi_protocol_spec.pdf
 
 以上为设计依据，不构成目标 VCS 上的编译或仿真通过证据。
+
+
+## 2026-10-22 定向补充
+
+在原有入口之外，两套环境分别新增 `uc_rs_sc`、`cr_unique`、`cr_shared`（UVM完整类名加 `ace_v2_` 和 `_test`）。通过APB先建立和检查UC/SC，再完成指定CR24/16/8和缓存行为，完整保留逐拍、响应、ACK及数据检查。不使用force/deposit，不修改RTL、覆盖计划或冲突判据。
+
+普通并行流量规则保持。仅这三个定向用例允许Home关闭的前置状态建立与分阶段开放，目的是证明指定功能，而非消除并发诊断。`cache`回归运行三项；`coverage`回归运行六模式smoke、三项定向和十六项burst边界，共25项，失败即停止。负向和数据别名诊断仍独立。
+
+新旧验证源码的输出不能直接混并，运行准备见两套使用说明。RTL审核事实、证据范围及风险见[rtl_review.md](rtl_review.md)。实验复现代码和日志留在工程之外，文档不收录临时任务清单。

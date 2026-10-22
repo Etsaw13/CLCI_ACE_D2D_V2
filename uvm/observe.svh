@@ -66,10 +66,12 @@ assign vif.link_ready=ace_rst_n===1'b1 &&
   die0.u_st_s_reg_inst0.rx_link_status===2'b11 && die1.u_st_s_reg_inst0.rx_link_status===2'b11 &&
   die0.u_st_s_reg_inst0.pcs_rx_cmd_rx_link_ok===1'b1 && die1.u_st_s_reg_inst0.pcs_rx_cmd_rx_link_ok===1'b1 &&
   die0.u_st_s_reg_inst0.pcs_mac_tx_ready_enable===1'b1 && die1.u_st_s_reg_inst0.pcs_mac_tx_ready_enable===1'b1;
-assign vif.quiet_hw=vif.link_ready && vif.src_valid===10'b0 && vif.dst_valid===10'b0 &&
+assign vif.idle_hw=vif.link_ready && vif.src_valid===10'b0 && vif.dst_valid===10'b0 &&
   u_master.st==u_master.M_IDLE && u_master.sn==u_master.S_IDLE &&
   u_slave.st==u_slave.B_IDLE && (u_slave.hs==u_slave.H_IDLE || u_slave.hs==u_slave.H_GAP) &&
-  u_slave.aw_pend===1'b0 && u_slave.ar_pend===1'b0 && u_slave.scan_hit===1'b0;
+  u_slave.aw_pend===1'b0 && u_slave.ar_pend===1'b0;
+assign vif.quiet_hw=vif.idle_hw && u_slave.scan_hit===1'b0;
+assign vif.home_rotation=u_slave.h_rot;
 assign vif.status_a={u_master.o_any_err,u_master.err_snoop_timeout,u_master.err_main_timeout,
                      u_master.err_wr_prbs,u_master.err_rsp,u_master.err_rd_data};
 assign vif.status_b={u_slave.o_any_err,u_slave.err_slave_timeout,u_slave.err_snoop_timeout,
@@ -80,5 +82,11 @@ assign vif.cnt_wr=u_slave.o_cnt_wr;
 assign vif.cnt_rd=u_slave.o_cnt_rd;
 assign vif.cnt_b_snoop=u_slave.o_cnt_snoop;
 for(genvar n=0;n<4;n++) begin:cache_observation
+  assign vif.directory_valid[n]=u_slave.dir_valid[n];
+  assign vif.directory_tag[n]=u_slave.dir_tag[n];
+  assign vif.directory_state[n]=u_slave.dir_state[n];
+  assign vif.memory_written[n]=u_slave.mem_written[n];
+  assign vif.memory_tag[n]=u_slave.mem_tag[n];
+  assign vif.memory_data[n]=u_slave.mem[n];
   assign vif.cache[n]={u_master.c_valid[n],u_master.c_tag[n],u_master.c_state[n],u_master.c_data[n]};
 end

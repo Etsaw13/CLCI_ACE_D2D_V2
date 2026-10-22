@@ -21,7 +21,7 @@ export VCS_INCLUDE=/eda/synopsys/V-2023.12-SP2/include
 
 需要 Python 3.6+、Bash、VCS 自带 UVM 1.2 和支持原 CLCI 加密文件的授权安装。不需要安装 Python 第三方包，不调用 URG 或 Verdi。
 
-## 九类测试与独立诊断
+## 原有九类测试与独立诊断
 
 格式：`bash uvm/sim/run.sh 测试名 模式 seed [附加参数...]`。
 
@@ -164,3 +164,48 @@ bash uvm/sim/merge_code_coverage.sh
 当前适配 VCS V-2023.12-SP2，依赖 runtime 后端进行计数核对；s206 已用 16 次普通通过的 UVM 运行完成 v3 合并，并打开 HTML 首页及未覆盖清单，基本块并集为 404/458（88.21%）。这项证据不扩大 toggle、FSM、branch 的指标支持边界。Line/condition 与原 runtime 计数对照，toggle 原始槽位、FSM 合计和 branch 槽位单独说明口径。输入筛选、指定运行及源码颜色说明见 [代码覆盖率使用说明](code_coverage.md)，实测来源见 [检查记录](VALIDATION.md)。
 
 所有覆盖项定义见[test_plan.md](test_plan.md)，文件和检查原理见[uvm_design.md](uvm_design.md)。先完成APB和默认smoke，再扩大测试规模；当前真实VCS/UVM和CLCI运行结果仍需你在目标服务器确认。
+
+## 2026-10-22：缓存与 CR 定向补充
+
+新增三个独立入口，正式顶层仍经过真实 CLCI，全部激励通过 APB 和 ACE 内部发生器产生。
+
+| 入口 | 前置状态与必查结果 |
+|---|---|
+| `ace_v2_uc_rs_sc_test` | Home 关闭时单拍写建立 UC，所有主事务与 ACK 排空后，Home ReadShared 返回 CR24，缓存和目录成为 SC，数据保持；UC_RS_SC 必须命中且无冲突，最后由 MakeInvalid 清理 |
+| `ace_v2_cr_unique_test` | 分阶段建立 UC，利用 Home 的 RS/MI/CI/RO 轮转，最终 UC + ReadOnce 必须返回 CR16；每个阶段检查实际 AC/CR、状态、数据和计数 |
+| `ace_v2_cr_shared_test` | 单拍写建立 UC，再以单拍 RS 取得 IsShared 并成为 SC；Home ReadShared 必须返回 CR8、保持 SC 和数据，随后 MakeInvalid 清理 |
+
+```bash
+bash uvm/sim/run.sh ace_v2_uc_rs_sc_test 0 1
+bash uvm/sim/run.sh ace_v2_cr_unique_test 0 1
+bash uvm/sim/run.sh ace_v2_cr_shared_test 0 1
+
+# 只运行上面三个用例，模式0，各自独立仿真
+bash uvm/sim/regression.sh cache
+
+# 六种模式smoke + 三个缓存定向 + 十六项读写burst边界，共25次
+bash uvm/sim/regression.sh coverage
+```
+
+这些固定流程不接受显式 `+TX_TARGET`、`+BURST_BEATS`；DV 也不接受 `+DIRECTION`。Home 间隔固定为 255，显式其他 `+SNOOP_GAP` 会拒绝。仍可选择模式、seed、BASE、PRBS_CODE、XCODE 和超时。请求下限来自各流程，APB 停发前已经接受的额外任务也全部检查，不能把日志截成固定笔数。
+
+每个定向阶段检查实际通道与 ACK 排空、缓存和 Home 目录的 tag/state、独立预期数据及 Home 存储。指定 CR 和缓存行为未出现、出现额外 snoop/CD、状态不符或关联冲突均失败。旧 smoke、压力和普通定向流量继续并行；这三个隔离前置状态的用例只证明具体功能可达，不证明并发竞争已经修复。
+
+### 新旧验证版本的结果分开保存
+
+本批改变了验证源码，旧结果的 `verification_checksums` 与新版本不同。两种合并器都继续拒绝混合验证版本；不要修改旧 run.json 校验值来强行合并。旧 VDB 和报告应保留。
+
+建议在运行本批前，将已有 `uvm/out` 移到工程外的历史目录，再运行上面的 `coverage` 回归和合并。下面仅移动历史结果，不删除它们；从工程根目录执行一次：
+
+```bash
+stamp=$(date +%Y%m%d_%H%M%S)
+if [ -d uvm/out ]; then
+  mv uvm/out "../CLCI_ACE_D2D_V2_uvm_out_before_${stamp}"
+fi
+
+bash uvm/sim/regression.sh coverage
+bash uvm/sim/merge_coverage.sh
+bash uvm/sim/merge_code_coverage.sh
+```
+
+不要在已有仿真运行时移动输出。25 次回归沿用原覆盖判据，不保证所有安装、时序与配置都自动达到 44/44；未命中仍如实列出。新增测试的本地检查范围见 [检查记录](VALIDATION.md)，未修改的 RTL 中已复现问题见 [RTL 审核](rtl_review.md)。本批新增用例仍需 s206 的真实 VCS/CLCI 验证。

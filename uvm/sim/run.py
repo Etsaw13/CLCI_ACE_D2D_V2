@@ -16,7 +16,7 @@ from check_project import ROOT, check
 TESTS = ('ace_v2_apb_test', 'ace_v2_smoke_test', 'ace_v2_single_write_test',
          'ace_v2_single_read_test', 'ace_v2_burst_write_test', 'ace_v2_burst_read_test',
          'ace_v2_snoop_stress_test', 'ace_v2_pause_resume_test', 'ace_v2_error_status_test',
-         'ace_v2_data_alias_diag_test')
+         'ace_v2_uc_rs_sc_test', 'ace_v2_cr_unique_test', 'ace_v2_cr_shared_test', 'ace_v2_data_alias_diag_test')
 LIMITS = {
     'TX_TARGET': (1, 100000), 'BURST_BEATS': (2, 256), 'PRBS_CODE': (0, 255),
     'XCODE': (0, 255), 'SNOOP_GAP': (0, 255), 'LINK_TIMEOUT_US': (1, 100000),
@@ -32,7 +32,8 @@ def arguments(argv):
         print('Numeric keys: ' + ', '.join(LIMITS))
         print('Other keys: +BASE_ADDR=<hex> +APB_TRACE')
         print('Default: ace_v2_smoke_test, mode=0, seed=1, TX_TARGET=64, BURST_BEATS=4.')
-        print('Nine regular tests; data_alias_diag is a separate non-normal diagnostic.')
+        print('Twelve regular tests; data_alias_diag is a separate non-normal diagnostic.')
+        print('Coverage cases use fixed phases: uc_rs_sc target minimum=2, cr_shared=3, cr_shared=3, cr_unique=6; SNOOP_GAP=255.')
         print('Environment: CHECK_ONLY, COVERAGE, COV_BACKEND, VCS_BIN, VCS_INCLUDE, PYTHON_BIN, UVM_VERBOSITY.')
         sys.exit(0)
     test = argv[0] if argv else 'ace_v2_smoke_test'
@@ -45,6 +46,9 @@ def arguments(argv):
     options = {'TX_TARGET': 64, 'BURST_BEATS': 4}
     if test == 'ace_v2_snoop_stress_test':
         options['SNOOP_GAP'] = 0
+    if test in ('ace_v2_uc_rs_sc_test', 'ace_v2_cr_unique_test', 'ace_v2_cr_shared_test'):
+        options['SNOOP_GAP'] = 255
+        options['TX_TARGET'] = 2 if test == 'ace_v2_uc_rs_sc_test' else 3 if test == 'ace_v2_cr_shared_test' else 6
     seen = set()
     for value in argv[3:]:
         match = re.fullmatch(r'\+([A-Z_]+)(?:=(.*))?', value)
@@ -71,6 +75,14 @@ def arguments(argv):
             options[key] = None
         else:
             raise ValueError('Unsupported argument: ' + value)
+    if test in ('ace_v2_uc_rs_sc_test', 'ace_v2_cr_unique_test', 'ace_v2_cr_shared_test'):
+        required = 2 if test == 'ace_v2_uc_rs_sc_test' else 3 if test == 'ace_v2_cr_shared_test' else 6
+        if 'BURST_BEATS' in seen:
+            raise ValueError('Coverage cases use single writes only; omit BURST_BEATS')
+        if 'TX_TARGET' in seen:
+            raise ValueError('Coverage cases have fixed phases; omit TX_TARGET (minimum {}), all actual transactions are checked'.format(required))
+        if options['SNOOP_GAP'] != 255 or options['TX_TARGET'] != required:
+            raise ValueError('Coverage case requires TX_TARGET={} and SNOOP_GAP=255; all accepted transactions are checked'.format(required))
     target, beats = options['TX_TARGET'], options['BURST_BEATS']
     minima = {'ace_v2_smoke_test': 18, 'ace_v2_single_write_test': 2, 'ace_v2_single_read_test': 6,
               'ace_v2_snoop_stress_test': 32, 'ace_v2_pause_resume_test': 18, 'ace_v2_error_status_test': 8}

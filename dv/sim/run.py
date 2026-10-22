@@ -22,21 +22,23 @@ LIMITS = {
 
 def arguments(argv):
     if argv and argv[0] in ('-h', '--help'):
-        print('Usage: bash dv/sim/run.sh [apb|smoke|burst_boundary] [mode 0..5] [seed] [+KEY=VALUE ...]')
+        print('Usage: bash dv/sim/run.sh [apb|smoke|burst_boundary|uc_rs_sc|cr_unique|cr_shared] [mode 0..5] [seed] [+KEY=VALUE ...]')
         print('Numeric keys: ' + ', '.join(LIMITS))
         print('Other keys: +DIRECTION=write|read +BASE_ADDR=<hex> +APB_TRACE')
         print('Default: smoke, mode=0, seed=1, TX_TARGET=64, BURST_BEATS=4.')
         print('burst_boundary defaults to TX_TARGET=1 and requires exactly that setting.')
+        print('uc_rs_sc/cr_unique/cr_shared use fixed APB phases; no TX_TARGET/BURST_BEATS/DIRECTION override; SNOOP_GAP=255.')
         print('Environment: CHECK_ONLY=1, COVERAGE=0|1, COV_BACKEND=runtime|collect, VCS_BIN, VCS_INCLUDE, PYTHON_BIN.')
         sys.exit(0)
     test = argv[0] if argv else 'smoke'
     mode = argv[1] if len(argv) > 1 else '0'
     seed = argv[2] if len(argv) > 2 else '1'
-    if test not in ('apb', 'smoke', 'burst_boundary') or not re.fullmatch('[0-5]', mode):
+    if test not in ('apb', 'smoke', 'burst_boundary', 'uc_rs_sc', 'cr_unique', 'cr_shared') or not re.fullmatch('[0-5]', mode):
         raise ValueError('Invalid test/mode; use --help')
     if not re.fullmatch('[0-9]{1,10}', seed) or not 1 <= int(seed) <= 2147483647:
         raise ValueError('Seed must be 1..2147483647')
-    options = {'TX_TARGET': 1 if test == 'burst_boundary' else 64, 'BURST_BEATS': 4}
+    target = {'burst_boundary': 1, 'uc_rs_sc': 2, 'cr_unique': 6, 'cr_shared': 3}.get(test, 64)
+    options = {'TX_TARGET': target, 'BURST_BEATS': 4}
     seen = set()
     for value in argv[3:]:
         match = re.fullmatch(r'\+([A-Z_]+)(?:=(.*))?', value)
@@ -67,6 +69,13 @@ def arguments(argv):
             raise ValueError('Unsupported argument: ' + value)
     if test == 'burst_boundary' and options['TX_TARGET'] != 1:
         raise ValueError('burst_boundary uses TX_TARGET=1; run each direction/length separately')
+    if test in ('uc_rs_sc', 'cr_unique', 'cr_shared'):
+        for key in ('TX_TARGET', 'BURST_BEATS', 'DIRECTION'):
+            if key in seen:
+                raise ValueError(test + ' uses a fixed single-write/APB phase flow; do not set ' + key)
+        if 'SNOOP_GAP' in options and options['SNOOP_GAP'] != 255:
+            raise ValueError(test + ' requires SNOOP_GAP=255 for APB phase control')
+        options['SNOOP_GAP'] = 255
     base = int(str(options.get('BASE_ADDR', '20000000')), 16)
     if test == 'burst_boundary' and (base % 4096) + options['BURST_BEATS'] * 16 > 4096:
         raise ValueError('Boundary start address/length crosses 4KB')

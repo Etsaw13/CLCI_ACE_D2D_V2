@@ -94,5 +94,36 @@
     "dv/observe.svh": "2733d033ae371a94a91f896b8b8379507df0b5287698bec93a4c261f8b6a127a",
     "dv/tb_top.sv": "3ffd9c20d6edd22007ae5d3d4ace68e64c827fa382b3a26cc12c1bf89dfa0241"
   },
-  "record_scope": "dv"
+  "record_scope": "dv",
+  "coverage_supplement_20261022": {
+    "date": "2026-10-22",
+    "rtl_modified": false,
+    "coverage_plan_modified": false,
+    "new_cases": [
+      "uc_rs_sc",
+      "cr_unique",
+      "cr_shared"
+    ],
+    "regression": {
+      "cache_runs": 3,
+      "coverage_runs": 25,
+      "functional_bins_hit_in_local_coverage_suite": 44,
+      "functional_bins_planned": 44
+    },
+    "scope": "Local Verilator actual ACE; replacement CLCI channels. Not target VCS / encrypted CLCI validation.",
+    "target_vcs_executed": false,
+    "target_real_clci_executed": false,
+    "temporary_test_assets_shipped": false,
+    "static": {
+      "tool": "pyslang 8.1.0",
+      "encrypted_body_included": false,
+      "native_PLI_executed": false,
+      "errors": 0,
+      "diagnostics": 858,
+      "native_syntax_diagnostics": 887
+    },
+    "environment": "dv",
+    "local_execution_passed": 43,
+    "local_execution_total": 43
+  }
 }

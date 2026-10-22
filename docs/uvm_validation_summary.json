@@ -78,5 +78,38 @@
     "uvm/ace_uvm_tests.svh": "d002e7495a37bfc2359800f9335ef20cf45724bd991102fa1eb9014556a84132",
     "uvm/observe.svh": "8deda556fefbb9e93b22b0de4884adbe1e9d06ed958e0ebb42fd7a1f06a81e5c",
     "uvm/tb_top.sv": "50bc77f7e75a327e39d15ffc33cfc127ab8a7ac5d3396c16c821e5b3fe869296"
+  },
+  "coverage_supplement_20261022": {
+    "date": "2026-10-22",
+    "rtl_modified": false,
+    "coverage_plan_modified": false,
+    "new_cases": [
+      "uc_rs_sc",
+      "cr_unique",
+      "cr_shared"
+    ],
+    "regression": {
+      "cache_runs": 3,
+      "coverage_runs": 25,
+      "functional_bins_hit_in_local_coverage_suite": 44,
+      "functional_bins_planned": 44
+    },
+    "scope": "Local Verilator actual ACE; replacement CLCI channels. Not target VCS / encrypted CLCI validation.",
+    "target_vcs_executed": false,
+    "target_real_clci_executed": false,
+    "temporary_test_assets_shipped": false,
+    "static": {
+      "tool": "pyslang 8.1.0",
+      "encrypted_body_included": false,
+      "native_PLI_executed": false,
+      "errors": 0,
+      "diagnostics": 3165,
+      "native_syntax_diagnostics": 3194
+    },
+    "environment": "uvm",
+    "local_execution_passed": 49,
+    "local_execution_total": 49,
+    "full_uvm_scheduler_executed": false,
+    "full_uvm_1_2_static_library": true
   }
 }

@@ -18,3 +18,5 @@ bash uvm/sim/merge_code_coverage.sh
 九类测试已实现，另有独立的数据别名诊断。实际 VCS/UVM 调度与真实 CLCI 链路仍须在目标服务器验证；本机和 myserver 都没有 VCS。
 
 `merge_coverage.sh` 合并功能覆盖并单列负向/诊断结果；`merge_code_coverage.sh` 只对普通通过运行做 VDB 逐点并集，结果写入本环境的 `out/code_coverage/`。原生格式适配的目标实测状态见上述使用说明。
+
+新增缓存/CR定向用例：`bash uvm/sim/regression.sh cache`；完整功能覆盖回归：`bash uvm/sim/regression.sh coverage`（25次）。本批新增验证源码与历史输出的版本校验值不同，运行前的输出归档和具体流程见对应运行说明。RTL审核见 [rtl_review.md](../docs/rtl_review.md)。

@@ -15,7 +15,15 @@ case "${SUITE}" in
         bash "${HERE}/run.sh" "${test}" 0 1 +TX_TARGET=1 "+BURST_BEATS=${beats}"
       done
     done;;
+  cache)
+    for test in ace_v2_uc_rs_sc_test ace_v2_cr_unique_test ace_v2_cr_shared_test; do
+      bash "${HERE}/run.sh" "${test}" 0 1
+    done;;
+  coverage)
+    bash "${BASH_SOURCE[0]}" smoke
+    bash "${BASH_SOURCE[0]}" cache
+    bash "${BASH_SOURCE[0]}" boundary;;
   negative)
     bash "${HERE}/run.sh" ace_v2_error_status_test 0 1;;
-  *) echo 'Usage: bash uvm/sim/regression.sh smoke|directed|boundary|negative' >&2; exit 2;;
+  *) echo 'Usage: bash uvm/sim/regression.sh smoke|directed|boundary|cache|coverage|negative' >&2; exit 2;;
 esac

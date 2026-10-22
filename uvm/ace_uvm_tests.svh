@@ -6,6 +6,9 @@ class ace_v2_base_test extends uvm_test;
     super.build_phase(phase);cfg=ace_v2_config::type_id::create("cfg");cfg.kind=kind;
     if(!uvm_config_db#(virtual ace_uvm_if)::get(this,"","vif",cfg.vif)) `uvm_fatal("VIF","Missing interface")
     if(kind=="ace_v2_snoop_stress_test") cfg.snoop_gap=0;
+    if(kind inside {"ace_v2_uc_rs_sc_test","ace_v2_cr_unique_test","ace_v2_cr_shared_test"}) begin
+      cfg.snoop_gap=255;cfg.tx_target=(kind=="ace_v2_uc_rs_sc_test")?2:(kind=="ace_v2_cr_shared_test")?3:6;
+    end
     cfg.parse();uvm_config_db#(ace_v2_config)::set(this,"*","cfg",cfg);
     env=ace_v2_env::type_id::create("env",this);
   endfunction
@@ -53,6 +56,9 @@ endclass
 `ACE_V2_TEST(ace_v2_snoop_stress_test)
 `ACE_V2_TEST(ace_v2_pause_resume_test)
 `ACE_V2_TEST(ace_v2_error_status_test)
+`ACE_V2_TEST(ace_v2_uc_rs_sc_test)
+`ACE_V2_TEST(ace_v2_cr_unique_test)
+`ACE_V2_TEST(ace_v2_cr_shared_test)
 // Separate diagnostic, excluded from normal coverage merging.
 `ACE_V2_TEST(ace_v2_data_alias_diag_test)
 `undef ACE_V2_TEST

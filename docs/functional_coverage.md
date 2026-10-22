@@ -217,3 +217,10 @@ DV 和 UVM 的 bin 定义相同，但现有报告器按各自格式和环境校�
 - 当前实现：[A 模块](../ace/module_a.sv)、[B 模块](../ace/module_b.sv)、[参数与编码](../ace/ace_pkg.sv)、[数据码型](../ace/ace_funcs.svh)。
 - 范围及通过条件：[已确认测试方案](test_plan.md)。
 - 标准术语对照：[Arm AMBA AXI and ACE Protocol Specification，IHI 0022H.c](https://documentation-service.arm.com/static/602a9df190ee6824a1e02b98)，D3.1、D3.6、D3.7。本工程覆盖分母由当前实现和本计划定义。
+
+
+## 定向证据入口（2026-10-22）
+
+两套环境各有 `uc_rs_sc`、`cr_unique`、`cr_shared`，UVM类名为 `ace_v2_<入口>_test`。三个用例分别稳定建立UC/SC并检查CR24/16/8；UC_RS_SC要求完整前后状态、数据和响应证据，以及零冲突/未匹配。CR16/CR8阶段还检查实际AC类型和单次响应，不能只凭整体仿真PASS推断命中。
+
+`regression.sh cache`只跑三个定向入口；`regression.sh coverage`含数据模式和burst边界，共25项。新用例未改变本文件44个bin定义。隔离前置状态的命中不表示并发排序问题已修复；相关边界见[RTL审核](rtl_review.md)。

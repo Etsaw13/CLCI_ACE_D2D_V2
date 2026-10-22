@@ -49,6 +49,10 @@ package ace_uvm_pkg;
          progress_us<0 || progress_us>1000 || pause_cycles<16 || pause_at<0 || error_target<2 ||
          !(backend inside {"off","collect","runtime"})) `uvm_fatal("ARGS","Invalid UVM configuration")
       base_address=wide_address[43:0];
+      if(kind inside {"ace_v2_uc_rs_sc_test","ace_v2_cr_unique_test","ace_v2_cr_shared_test"}) begin
+        if(snoop_gap!=255 || tx_target!=((kind=="ace_v2_uc_rs_sc_test")?2:(kind=="ace_v2_cr_shared_test")?3:6))
+          `uvm_fatal("DIRECTED_ARGS","Coverage cases require fixed TX_TARGET=2/3/6 and SNOOP_GAP=255")
+      end
       if(pause_at==0) pause_at=(tx_target>2)?tx_target/2:1;
     endfunction
   endclass

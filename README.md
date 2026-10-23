@@ -45,3 +45,12 @@ bash uvm/sim/merge_code_coverage.sh
 独立数据别名诊断已在本地真实ACE上复现五种模式的数据自检矛盾；RTL按要求保持不变，失败不计作PASS。该诊断与普通回归分开，详见KNOWN_ISSUES.md。
 
 新增 `regression.sh cache` 分别运行三个 CR/缓存定向用例；`regression.sh coverage` 分别运行25项覆盖回归。DV与UVM各自独立执行。ACE/CLCI RTL及44个bin的覆盖判据保持不变；本批新增用例尚待s206运行。
+
+
+## GitHub 源码与本地 CLCI 依赖
+
+Git 不追踪根目录 `clci/`，发布历史也不包含该目录。GitHub 克隆只提供 ACE、DV/UVM 验证环境、脚本和文档。
+
+完整仿真仍需要原有 27 份 CLCI 依赖。请在有授权的环境中将其放回工程根目录 `clci/`，保持 `docs/source_manifest.json` 的目录结构和校验值，然后运行两套 `sim/check_project.py`。服务器和本机已有的 CLCI 文件继续保留，Git 排除不会删除它们。
+
+`docs/files.md` 列出本地完整工程所需文件；其中 CLCI 项是本地外部依赖，不属于 Git 追踪文件。

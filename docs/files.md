@@ -54,6 +54,11 @@
 - 新增`docs/rtl_review.md`；更新两套运行/设计说明、测试与覆盖说明、检查记录、历史验证JSON的本批条目、两套README和根README。
 - 新测试通过APB配置，新增DUT内部连接均只读。ACE/CLCI、checker、cache覆盖观察器和44bin计划不变。实验/适配代码和运行输出不收录。
 
+
+## Git 追踪范围（2026-10-23）
+
+GitHub 发布排除全部历史中的根目录 `clci/`，当前 `.gitignore` 也忽略该目录。现有 27 份 CLCI 文件仍保留在本机和开发服务器，作为仿真所需的本地外部依赖。Git 当前追踪 65 份文件；下表仍是本地完整工程的 92 份文件清单，不能将其理解为 GitHub 会提供全部 CLCI 源码。
+
 ## 全部交付文件
 
 代码覆盖率新增独立的 `dv/sim/merge_code_coverage.py`、`dv/sim/merge_code_coverage.sh`、`uvm/sim/merge_code_coverage.py` 和 `uvm/sim/merge_code_coverage.sh`，各自只读本环境 VDB，报告保存在各自的 `out/code_coverage/`。新增 `docs/code_coverage.md`，更新两套 README、运行说明、根 README 和检查记录。源码和仿真组件不变；合成测试、样例 VDB、校准源码及日志继续留在工程外。
@@ -62,8 +67,8 @@
 
 | 路径 | SHA-256 |
 |---|---|
-| `.gitignore` | c231e433eb5690dbbbf32d146e22e21d88ba1e777dc31b763c909f159da8b078 |
-| `README.md` | ccd100aa361c7786c1d2017a91b0987d492d54df4b83131e56dbf80a23f7793d |
+| `.gitignore` | 7c221263e100f4351b0f31091141d0a2074774e5e12ff667b6294519d8be4c91 |
+| `README.md` | 6ba0bb0bfdfa1d60ef363c340b1babd351342735d8189f73a27152bed3b429f4 |
 | `ace/ace_funcs.svh` | 3e3aba622f0e602b44127d56e7fafc74656de6dbb06cdb26938a8dc8970ddb58 |
 | `ace/ace_pkg.sv` | f18c24bd8e73f130b67e377cf9cec5efe3b1489cd06511e0631d4344cafea71f |
 | `ace/module_a.sv` | b34cff86db0aab09f287f6b1e569062ec84e8ff9cbcbc35fc3f85b46a628da29 |

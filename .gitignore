@@ -8,3 +8,6 @@ __pycache__/
 *.vpd
 core
 core.*
+
+# Local CLCI dependencies; supplied separately.
+/clci/

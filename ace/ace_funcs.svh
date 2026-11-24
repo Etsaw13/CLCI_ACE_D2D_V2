@@ -54,13 +54,13 @@
     prbs10_128 = o;
   endfunction
 
-  // PRBS 种子: 行地址折叠 ^ 拍号 ^ 码型 —— 两端 (A/B) 必须逐位一致
+  // PRBS 种子: 行地址折叠 ^ 码型。
+  // 最终物理行地址已经包含 burst 拍偏移，不再叠加事务内拍号，
+  // 保证同一物理地址在 single/burst 的任何位置上数据唯一。
   function automatic logic [30:0] prbs_seed(logic [TAG_W-1:0] line_addr,
-                                            logic [7:0]       beat,
                                             logic [7:0]       code);
     prbs_seed = line_addr[30:0]
               ^ {3'b0, line_addr[39:33], line_addr[29:9]}
-              ^ {23'b0, beat}
               ^ {23'b0, code};
   endfunction
 
@@ -79,33 +79,28 @@
     pat_xcode = {16{cfg_xcode}};
   endfunction
 
-  // mode=2 行号+拍号序列号: 4 个 32b lane, 每个字节位置都带行身份
+  // mode=2 行地址序列号: 4 个 32b lane，每个 lane 携带物理行身份
   //   (抓数据送错行/拍序错乱; lane 内不放长串零, 避免高位粘 0 被期望值掩盖)
-  function automatic logic [DATA_W-1:0] pat_seq(logic [TAG_W-1:0] line,
-                                                logic [7:0]       beat);
-    pat_seq = {4{line[15:0], beat, line[23:16]}};
+  function automatic logic [DATA_W-1:0] pat_seq(logic [TAG_W-1:0] line);
+    pat_seq = {4{line[15:0], line[31:24], line[23:16]}};
   endfunction
 
-  // mode=3 走 1 码: one-hot 按 (行低位+拍) 循环左移 (抓位滑动)
-  function automatic logic [DATA_W-1:0] pat_walk1(logic [TAG_W-1:0] line,
-                                                  logic [7:0]       beat);
-    logic [7:0] sh;
-    sh = line[6:0] + beat;
-    pat_walk1 = {{(DATA_W-1){1'b0}}, 1'b1} << sh[6:0];
+  // mode=3 走 1 码: one-hot 位置由物理行地址低位决定 (抓位滑动)
+  function automatic logic [DATA_W-1:0] pat_walk1(logic [TAG_W-1:0] line);
+    pat_walk1 = {{(DATA_W-1){1'b0}}, 1'b1} << line[6:0];
   endfunction
 
-  // 某行某拍的期望数据: 按 cfg_data_mode 分发 (A/B 两侧同公式)
+  // 某物理行的期望数据: 按 cfg_data_mode 分发 (A/B 两侧同公式)
   // 0=PRBS31, 1=xcode, 2=sequence, 3=walking-1, 4=PRBS23, 5=PRBS10
-  function automatic logic [DATA_W-1:0] beat_data(logic [TAG_W-1:0] line,
-                                                  logic [7:0]       beat);
+  function automatic logic [DATA_W-1:0] line_data(logic [TAG_W-1:0] line);
     logic [30:0] seed31;
-    seed31 = prbs_seed(line, beat, cfg_prbs_code);
+    seed31 = prbs_seed(line, cfg_prbs_code);
     case (cfg_data_mode)
-      3'd1:    beat_data = pat_xcode();
-      3'd2:    beat_data = pat_seq(line, beat);
-      3'd3:    beat_data = pat_walk1(line, beat);
-      3'd4:    beat_data = prbs23_128(seed31[22:0]);
-      3'd5:    beat_data = prbs10_128(seed31[9:0]);
-      default: beat_data = prbs128(seed31);
+      3'd1:    line_data = pat_xcode();
+      3'd2:    line_data = pat_seq(line);
+      3'd3:    line_data = pat_walk1(line);
+      3'd4:    line_data = prbs23_128(seed31[22:0]);
+      3'd5:    line_data = prbs10_128(seed31[9:0]);
+      default: line_data = prbs128(seed31);
     endcase
   endfunction

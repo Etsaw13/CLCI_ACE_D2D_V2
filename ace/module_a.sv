@@ -10,7 +10,7 @@
 //   ⑤ PRBS        : ace_pkg::prbs128, 按地址种子, 两端同公式
 //
 // 关键约定:
-//   - 串行事务: 读/写单笔在途; snoop 在主事务在途时于入口推迟 (acready 门控)
+//   - 串行主事务: 读/写单笔在途; 先到达的 snoop 可在主请求等待 READY 时完成
 //   - 读填充按 RRESP 落状态: RU+PassDirty→UD / RS+IsShared→SC / 其余→UC
 //   - WriteLineUnique 直写式: 数据照进内存, 行保留 UC + 刷新快照
 //   - UD 行被质询: 统一应答 DT|PassDirty|WasUnique 并经 CD 交整行, 行→I
@@ -426,7 +426,9 @@ module module_a (
         c_data[ord_line_l[IDX_W-1:0]] <= wdata;
       if (rvalid && rready && (st == M_R_R) && (rid == ar_id_c))
         c_data[ar_slot] <= rdata;
-      if (sn_upd_fire) begin
+      // A snoop miss has no cache side effect. Use the update-enable sampled
+      // with AC so a miss cannot evict another tag in the same cache slot.
+      if (sn_upd_fire && sn_upd_en_l) begin
         c_valid[sn_idx_l] <= sn_upd_vld_l;
         c_tag[sn_idx_l]   <= sn_tag_l;
         c_state[sn_idx_l] <= sn_upd_st_l;
@@ -469,8 +471,7 @@ module module_a (
   assign awvalid  = (st == M_W_AW);
 
   // ---- W 通道 ----
-  assign wdata  = beat_data(ord_line_l + {{(TAG_W-8){1'b0}}, main_beat_cnt},
-                            main_beat_cnt);
+  assign wdata  = line_data(ord_line_l + {{(TAG_W-8){1'b0}}, main_beat_cnt});
   assign wstrb  = {STRB_W{1'b1}};
   assign wlast  = (main_beat_cnt == ord_len_l);
   assign wvalid = (st == M_W_W);
@@ -499,8 +500,7 @@ module module_a (
 
   // ---- R 通道 ----
   logic [DATA_W-1:0] rdata_exp;
-  assign rdata_exp = beat_data(ar_line_l + {{(TAG_W-8){1'b0}}, main_beat_cnt},
-                               main_beat_cnt);
+  assign rdata_exp = line_data(ar_line_l + {{(TAG_W-8){1'b0}}, main_beat_cnt});
   // (rdata_exp 依赖 ord_line_l 锁存的行 —— M_R_AR 时已拷贝到 ar_line_l)
 
   assign rready = (st == M_R_R);
@@ -597,10 +597,6 @@ module module_a (
     end
   end
 
-  // ---- 在途标记: 主事务活动期间 snoop 于入口推迟 (D10 连带调整) ----
-  logic main_busy;
-  assign main_busy = (st != M_IDLE);
-
   // =====================================================================
   // ④ snoop 响应器: AC → 查③ → CRRESP 决策表 → CR → 更新③
   // =====================================================================
@@ -610,7 +606,9 @@ module module_a (
   logic [CRRESP_W-1:0] sn_resp;
 
   assign sn_lk_addr = to_line(acaddr);
-  assign acready    = areset_n && (sn == S_IDLE) && !main_busy;  // 复位期间保持低
+  // B serializes request acceptance after an earlier AC. A must accept that
+  // AC while a main request waits for AW/AR READY, avoiding a CR/READY deadlock.
+  assign acready    = areset_n && (sn == S_IDLE);  // 复位期间保持低
 
   // CRRESP 决策表 (4 态 × 5 质询)
   // 注意: 用当前输入 acsnoop 计算 (握手时锁存计算结果)

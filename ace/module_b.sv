@@ -9,7 +9,7 @@
 //   ④ 数据码型单元: PRBS31/PRBS23/PRBS10及固定模式，与 Module A 同公式
 //
 // 关键约定:
-//   - 串行事务: AW/AR 仅在空闲时接收 (背压即合法, 支持后续 Mode B 重叠)
+//   - 串行事务: AW/AR 仅在 slave 与 Home 均可接受时接收；先发 AC 完成后再开放主请求
 //   - RRESP 标签: RU→OKAY|PassDirty (制造脏行喂闭环); RS 且目录已有该行→OKAY|IsShared
 //   - 出题: UD 行发 CleanInvalid (收 CD 数据); SC/UC 行 RS/MI/CI/RO 四类轮转
 //   - CD 收货: DT=1 时接收整行, PRBS 逐位校验 (err_cd_data), 写内存, 目录销账
@@ -251,11 +251,15 @@ module module_b (
   logic [2:0]           aw_sn_l;
   logic [3:0]           ar_sn_l;
   logic [7:0]           beat_cnt;             // 本事务内拍计数
+  logic                 home_accept_block;    // earlier AC owns ordering until directory commit
 
   logic                 wlast_hs, rlast_hs;
 
-  assign awready = (st == B_IDLE);
-  assign arready = (st == B_IDLE);
+  // If Home launched AC first, complete CR/CD and its directory update before
+  // accepting a later main request. If AW/AR wins first, aw_pend/ar_pend keeps
+  // Home idle until the corresponding ACK.
+  assign awready = (st == B_IDLE) && !home_accept_block;
+  assign arready = (st == B_IDLE) && !home_accept_block;
 
   // ---- W 通道: 逐拍 PRBS 互核 + 写入内存 ----
   logic [TAG_W-1:0]    w_cur_line;
@@ -264,7 +268,7 @@ module module_b (
 
   assign w_cur_line = aw_line_l + {{(TAG_W-8){1'b0}}, beat_cnt};
   assign w_mem_idx  = w_cur_line[IDX_W-1:0];
-  assign w_exp      = beat_data(w_cur_line, beat_cnt);
+  assign w_exp      = line_data(w_cur_line);
   assign wready     = (st == B_W);
 
   // ---- B 通道 ----
@@ -282,7 +286,7 @@ module module_b (
   assign r_mem_idx  = r_cur_line[IDX_W-1:0];
   assign r_mem_data = (mem_written[r_mem_idx] &&
                        (mem_tag[r_mem_idx] == r_cur_line))
-                    ? mem[r_mem_idx] : beat_data(r_cur_line, beat_cnt);
+                    ? mem[r_mem_idx] : line_data(r_cur_line);
   assign r_dir_hit  = dir_valid[r_mem_idx] && (dir_tag[r_mem_idx] == r_cur_line);
   assign rvalid     = (st == B_R);
   assign rid        = ar_id_l;
@@ -424,6 +428,7 @@ module module_b (
   // =====================================================================
   typedef enum logic [2:0] {H_IDLE, H_SEND_AC, H_WAIT_CR, H_WAIT_CD, H_GAP} h_e;
   h_e hs;
+  assign home_accept_block = (hs != H_IDLE);
 
   logic [3:0]            h_type_l;         // 已发出质询的类型锁存
   logic [CRRESP_W-1:0]   h_exp_l;          // 已发出质询的期望应答锁存
@@ -639,7 +644,7 @@ module module_b (
         err_wr_data_q <= 1'b1;
       // CD 收货数据互核 (脏行交回应为 PRBS(line) )
       if (cdvalid && cdready &&
-          (cddata != beat_data(to_line(h_addr_l), 8'd0)))
+          (cddata != line_data(to_line(h_addr_l))))
         err_cd_data_q <= 1'b1;
       // 质询超时 (发送 AC、等待 CR、等待 CD 三个窗口共用闹钟)
       if ((hs == H_SEND_AC) && (to_cnt == SNOOP_TIMEOUT-1) &&

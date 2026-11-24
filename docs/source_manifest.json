@@ -1,7 +1,7 @@
 {
   "ace_commit": "6c306d613fd095f712caa8df44ccbe82f55569ae",
   "clci_baseline": "myserver:/cluster/home/yvly/mywork/CLCI_ACE_D2D",
-  "phase": "DV and independent UVM implemented; target VCS/CLCI validation pending",
+  "phase": "Address-stable data, Home/main acceptance ordering, and snoop-miss cache fixes integrated on current DV/UVM cache-test baseline",
   "files": [
     {
       "path": "ace/ace_pkg.sv",
@@ -10,18 +10,18 @@
     },
     {
       "path": "ace/ace_funcs.svh",
-      "source": "ACE git 6c306d613fd095f712caa8df44ccbe82f55569ae/rtl/ace_funcs.svh",
-      "sha256": "3e3aba622f0e602b44127d56e7fafc74656de6dbb06cdb26938a8dc8970ddb58"
+      "source": "ACE git 6c306d613fd095f712caa8df44ccbe82f55569ae baseline + address-stable data fix",
+      "sha256": "8d8b9120694e4f19e7a558e531b1a1098b41f585350264ea2957089956ec8fc1"
     },
     {
       "path": "ace/module_a.sv",
-      "source": "ACE git 6c306d613fd095f712caa8df44ccbe82f55569ae/rtl/module_a.sv",
-      "sha256": "b34cff86db0aab09f287f6b1e569062ec84e8ff9cbcbc35fc3f85b46a628da29"
+      "source": "ACE git 6c306d613fd095f712caa8df44ccbe82f55569ae baseline + address-stable data + AC ordering + snoop-miss fixes",
+      "sha256": "e5ea72ee3a2c378609180d7d9e418508cc703578534515d62820c301f82d842d"
     },
     {
       "path": "ace/module_b.sv",
-      "source": "ACE git 6c306d613fd095f712caa8df44ccbe82f55569ae/rtl/module_b.sv",
-      "sha256": "2c1ed801b1db4bf155cca5e4517a7e5039836ebd34c7f66020a2ff2d1025bab4"
+      "source": "ACE git 6c306d613fd095f712caa8df44ccbe82f55569ae baseline + address-stable data + Home/main acceptance ordering fix",
+      "sha256": "0c0ceeb7280bbde3668503ae6012fdd45345023b141c999eae2ee5fa3d513624"
     },
     {
       "path": "clci/rtl/define_bmx_ace128.v",

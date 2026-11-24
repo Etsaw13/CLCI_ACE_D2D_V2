@@ -29,7 +29,6 @@ CLCI_ACE_D2D_V2/
 
 ```bash
 python3 dv/sim/check_project.py
-python3 uvm/sim/check_project.py
 
 bash dv/sim/run.sh smoke 0 1 +TX_TARGET=64
 bash uvm/sim/run.sh ace_v2_apb_test 0 1

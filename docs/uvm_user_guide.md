@@ -5,14 +5,11 @@
 工程已同时包含 DV 与 UVM。myserver 上位置为 `/cluster/home/yvly/mywork/CLCI_ACE_D2D_V2`，该服务器没有 VCS，仅可检查文件。将完整工程放到有授权 VCS 的目标服务器，进入根目录后运行：
 
 ```bash
-python3 uvm/sim/check_project.py
-CHECK_ONLY=1 bash uvm/sim/run.sh ace_v2_smoke_test 0 1
-
 bash uvm/sim/run.sh ace_v2_apb_test 0 1
 bash uvm/sim/run.sh ace_v2_smoke_test 0 1 +TX_TARGET=64
 ```
 
-前两条只检查文件和参数，不表示仿真 PASS。若找不到工具，可按 s206 原安装配置：
+运行脚本会在调用 VCS 前校验源码清单中的 SHA-256。若找不到工具，可按 s206 原安装配置：
 
 ```bash
 export VCS_BIN=/eda/synopsys/V-2023.12-SP2/amd64/bin/vcs

@@ -10,10 +10,11 @@ package ace_uvm_checker_pkg;
     logic [255:0] sp[10],dp[10];
     internal_cache_line_t before_cache[N_LINES],after_cache[N_LINES];
   endclass
-  class snoop_context;
-    ac_t request;
-    logic [4:0] response;
-    logic [127:0] snapshot;
+  // Use explicit ACE-specific names for this internal transaction record.
+  class ace_snoop_record;
+    ac_t ac_payload;
+    logic [4:0] cr_value;
+    logic [127:0] data_value;
   endclass
   class ace_checker;
     generator_model generator;
@@ -35,7 +36,7 @@ package ace_uvm_checker_pkg;
     logic [127:0] memory[4];
     bit memory_valid[4];
     bit [39:0] memory_tag[4];
-    snoop_context ac_to_cr[$],cr_to_home[$],source_cd[$],destination_cd[$];
+    ace_snoop_record ac_to_cr[$],cr_to_home[$],source_cd[$],destination_cd[$];
     bit reported;
     bit expected_slverr;
     longint unsigned slverr_seen;
@@ -103,8 +104,8 @@ package ace_uvm_checker_pkg;
       if(int'(address[11:0])+n*16>4096)
         fail($sformatf("Burst crosses 4KB: addr=%h beats=%0d",address,n));
     endfunction
-    function logic [127:0] data_at(input bit [43:0] address,input int beat);
-      return expected_data(address,mode,code,fixed_byte,8'(beat));
+    function logic [127:0] data_at(input bit [43:0] address);
+      return expected_data(address,mode,code,fixed_byte);
     endfunction
     function void endpoint(input int side,ch,input logic valid,ready,input logic [255:0] payload);
       if($isunknown({valid,ready}) || (valid && $isunknown(payload)))
@@ -124,7 +125,7 @@ package ace_uvm_checker_pkg;
       r_t read_value;
       ac_t snoop_value;
       request_t expected;
-      snoop_context context_value;
+      ace_snoop_record context_value;
       bit hit;
       int slot,attribute;
       bit [43:0] address;
@@ -183,7 +184,7 @@ package ace_uvm_checker_pkg;
         write_value=w_t'(t.sp[W]);
         if(!sw_active) fail("Source W without AW");
         address=sw.addr+44'(sw_beat*16);
-        if(write_value.data!==data_at(address,sw_beat) || write_value.strb!==16'hffff ||
+        if(write_value.data!==data_at(address) || write_value.strb!==16'hffff ||
            write_value.last!==(sw_beat==int'(sw.len))) fail("Source W data/STRB/LAST mismatch");
         if(write_value.last) sw_active=0;else sw_beat++;
       end
@@ -198,7 +199,7 @@ package ace_uvm_checker_pkg;
         if(!br_active) fail("Source R without delivered AR");
         address=br.addr+44'(br_beat*16);slot=int'(address[5:4]);
         data_expected=(memory_valid[slot] && memory_tag[slot]==address[43:4])?
-          memory[slot]:data_at(address,br_beat);
+          memory[slot]:data_at(address);
         if(read_value.data!==data_expected || read_value.id!==br.id ||
            read_value.last!==(br_beat==int'(br.len)) || read_value.resp[1:0]!==0 ||
            read_value.resp[RR_PASSDIRTY] !== (br.snoop==ARSNOOP_READ_UNIQUE) ||
@@ -231,10 +232,10 @@ package ace_uvm_checker_pkg;
       if(df[AC]) begin
         snoop_value=ac_t'(t.dp[AC]);slot=int'(snoop_value.addr[5:4]);
         if(snoop_value.addr[3:0]!=0 || snoop_value.prot!=0) fail("Unaligned/unsupported AC");
-        context_value=new();context_value.request=snoop_value;
+        context_value=new();context_value.ac_payload=snoop_value;
         hit=t.before_cache[slot].valid && t.before_cache[slot].tag===snoop_value.addr[43:4];
-        context_value.response=expected_cr(hit,t.before_cache[slot].state,snoop_value.snoop);
-        context_value.snapshot=t.before_cache[slot].data;ac_to_cr.push_back(context_value);
+        context_value.cr_value=expected_cr(hit,t.before_cache[slot].state,snoop_value.snoop);
+        context_value.data_value=t.before_cache[slot].data;ac_to_cr.push_back(context_value);
         case(snoop_value.snoop)
           ARSNOOP_READ_SHARED:record(4,0);ARSNOOP_MAKE_INVALID:record(4,1);
           ARSNOOP_CLEAN_INVALID:record(4,2);ARSNOOP_READ_ONCE:record(4,3);
@@ -244,10 +245,10 @@ package ace_uvm_checker_pkg;
       if(sf[CR]) begin
         if(ac_to_cr.size()==0) fail("CR without delivered AC");
         context_value=ac_to_cr.pop_front();
-        if(t.sp[CR]!==256'(context_value.response)) fail("CR does not match independent response decision");
+        if(t.sp[CR]!==256'(context_value.cr_value)) fail("CR does not match independent response decision");
         cr_to_home.push_back(context_value);
-        if(context_value.response[CR_DT]) begin cd_expected++;source_cd.push_back(context_value);end
-        case(context_value.response)
+        if(context_value.cr_value[CR_DT]) begin cd_expected++;source_cd.push_back(context_value);end
+        case(context_value.cr_value)
           0:record(5,0);8:record(5,1);16:record(5,2);24:record(5,3);21:record(5,4);
           default:fail("Unexpected CR response combination");
         endcase
@@ -255,18 +256,18 @@ package ace_uvm_checker_pkg;
       if(df[CR]) begin
         if(cr_to_home.size()==0) fail("CR delivered before source response");
         context_value=cr_to_home.pop_front();
-        if(context_value.response[CR_DT]) destination_cd.push_back(context_value);
+        if(context_value.cr_value[CR_DT]) destination_cd.push_back(context_value);
       end
       if(sf[CD]) begin
         if(source_cd.size()==0) fail("CD without CR.DataTransfer obligation");
         context_value=source_cd.pop_front();
-        if(t.sp[CD]!==256'({context_value.snapshot,1'b1})) fail("CD differs from AC-time cache snapshot");
+        if(t.sp[CD]!==256'({context_value.data_value,1'b1})) fail("CD differs from AC-time cache snapshot");
       end
       if(df[CD]) begin
         if(destination_cd.size()==0) fail("Delivered CD without matched CR obligation");
-        context_value=destination_cd.pop_front();slot=int'(context_value.request.addr[5:4]);
+        context_value=destination_cd.pop_front();slot=int'(context_value.ac_payload.addr[5:4]);
         memory[slot]=t.dp[CD][128:1];memory_valid[slot]=1;
-        memory_tag[slot]=context_value.request.addr[43:4];
+        memory_tag[slot]=context_value.ac_payload.addr[43:4];
       end
       event_data='0;
       event_data.aw=sf[AW];event_data.ar=sf[AR];event_data.w_source=sf[W];

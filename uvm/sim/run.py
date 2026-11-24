@@ -144,9 +144,14 @@ def main():
         flags += ['-cm', 'line+cond+tgl+branch+fsm', '-cm_hier', 'uvm/sim/coverage_hierarchy.cfg']
     if include:
         flags += ['+define+ACE_V2_UVM_RUNTIME_COV', '+incdir+' + str(include)]
+
+    # Include verified headers and other manifest assets in the build key.
+    source_checksums = {entry['path']: entry['sha256'] for entry in manifest['files']}
+    filelist = ROOT / 'uvm/sim/filelist.f'
     fingerprint = hashlib.sha256(('\n'.join(flags) + '\n' + str(ROOT)).encode())
+    fingerprint.update(json.dumps(source_checksums, sort_keys=True).encode())
     for path in sorted(set(sources + list((ROOT / 'uvm').glob('*.sv*')) +
-                           [ROOT / 'uvm/sim/filelist.f', ROOT / 'uvm/sim/coverage_hierarchy.cfg'])):
+                           [filelist, ROOT / 'uvm/sim/coverage_hierarchy.cfg'])):
         fingerprint.update(path.read_bytes())
     if include:
         fingerprint.update((include / 'CoverMeter.vh').read_bytes())
@@ -163,7 +168,7 @@ def main():
               'plan': 'ace_v2_44', 'run_dir': str(run), 'vcs': binary,
               'verification_checksums': {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest()
                   for p in sorted(list((ROOT / 'uvm').glob('*.sv*')) + [ROOT / 'uvm/sim/coverage_plan.json'])},
-              'source_checksums': {p['path']: p['sha256'] for p in manifest['files']}}
+              'source_checksums': source_checksums}
     (run / 'run.json').write_text(json.dumps(record, indent=2) + '\n')
     print('RUN_DIR=' + str(run), flush=True)
     # Concurrent runs may share a build, but never compile or copy it mid-write.

@@ -35,18 +35,18 @@ package ace_uvm_model_pkg;
 
   function automatic logic [127:0] expected_data(
       input bit [43:0] address,input bit [2:0] mode,
-      input bit [7:0] code,fixed_byte,input bit [7:0] beat=0);
+      input bit [7:0] code,fixed_byte);
     bit [39:0] line;
     bit [30:0] seed,state31;
     bit [22:0] state23;
     bit [9:0] state10;
     logic [127:0] result;
     line=address[43:4];result='0;
-    seed=line[30:0]^{3'b0,line[39:33],line[29:9]}^{23'b0,beat}^{23'b0,code};
+    seed=line[30:0]^{3'b0,line[39:33],line[29:9]}^{23'b0,code};
     case(mode)
       1: for(int n=0;n<16;n++) result[n*8+:8]=fixed_byte;
-      2: for(int n=0;n<4;n++) result[n*32+:32]={line[15:0],beat,line[23:16]};
-      3: result[(int'(line[6:0])+int'(beat))%128]=1;
+      2: for(int n=0;n<4;n++) result[n*32+:32]={line[15:0],line[31:24],line[23:16]};
+      3: result[int'(line[6:0])]=1;
       4: begin
         state23=seed[22:0];if(state23==0) state23=1;
         for(int n=0;n<128;n++) begin

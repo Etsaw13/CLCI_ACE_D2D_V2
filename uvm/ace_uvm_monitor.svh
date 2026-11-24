@@ -16,7 +16,7 @@ class ace_v2_monitor extends uvm_monitor;
         if($isunknown({cfg.vif.status_a,cfg.vif.status_b})) `uvm_fatal("ACE_STATUS","Unknown ACE status")
         if((cfg.vif.status_a & ~cfg.allowed_a)!=0 || (cfg.vif.status_b & ~cfg.allowed_b)!=0) begin
           if(cfg.diagnostic && cfg.vif.status_a[0])
-            `uvm_fatal("DIAGNOSTIC_FAIL","Same-address data written at burst beat 1 differs from the single-read beat-0 self-check; RTL unchanged")
+            `uvm_fatal("DIAGNOSTIC_FAIL","Same-address data self-check failed after the address-stable data fix")
           `uvm_fatal("ACE_STATUS",$sformatf("Unexpected ACE status A=%h B=%h allowed=%h/%h stage=%s",cfg.vif.status_a,cfg.vif.status_b,cfg.allowed_a,cfg.allowed_b,cfg.stage))
         end
         t=new();t.svld=cfg.vif.src_valid;t.srdy=cfg.vif.src_ready;

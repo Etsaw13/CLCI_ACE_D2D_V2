@@ -22,7 +22,7 @@ LIMITS = {
 
 def arguments(argv):
     if argv and argv[0] in ('-h', '--help'):
-        print('Usage: bash dv/sim/run.sh [apb|smoke|burst_boundary|uc_rs_sc|cr_unique|cr_shared] [mode 0..5] [seed] [+KEY=VALUE ...]')
+        print('Usage: bash dv/sim/run.sh [apb|smoke|burst_boundary|uc_rs_sc|cr_unique|cr_shared|dirty_readonce|data_alias] [mode 0..5] [seed] [+KEY=VALUE ...]')
         print('Numeric keys: ' + ', '.join(LIMITS))
         print('Other keys: +DIRECTION=write|read +BASE_ADDR=<hex> +APB_TRACE')
         print('Default: smoke, mode=0, seed=1, TX_TARGET=64, BURST_BEATS=4.')
@@ -33,11 +33,13 @@ def arguments(argv):
     test = argv[0] if argv else 'smoke'
     mode = argv[1] if len(argv) > 1 else '0'
     seed = argv[2] if len(argv) > 2 else '1'
-    if test not in ('apb', 'smoke', 'burst_boundary', 'uc_rs_sc', 'cr_unique', 'cr_shared') or not re.fullmatch('[0-5]', mode):
+    if test not in ('apb', 'smoke', 'burst_boundary', 'uc_rs_sc', 'cr_unique', 'cr_shared',
+                    'dirty_readonce', 'data_alias') or not re.fullmatch('[0-5]', mode):
         raise ValueError('Invalid test/mode; use --help')
     if not re.fullmatch('[0-9]{1,10}', seed) or not 1 <= int(seed) <= 2147483647:
         raise ValueError('Seed must be 1..2147483647')
-    target = {'burst_boundary': 1, 'uc_rs_sc': 2, 'cr_unique': 6, 'cr_shared': 3}.get(test, 64)
+    target = {'burst_boundary': 1, 'uc_rs_sc': 2, 'cr_unique': 6, 'cr_shared': 3,
+              'dirty_readonce': 7, 'data_alias': 2}.get(test, 64)
     options = {'TX_TARGET': target, 'BURST_BEATS': 4}
     seen = set()
     for value in argv[3:]:
@@ -77,6 +79,11 @@ def arguments(argv):
             raise ValueError(test + ' requires SNOOP_GAP=255 for APB phase control')
         options['SNOOP_GAP'] = 255
     base = int(str(options.get('BASE_ADDR', '20000000')), 16)
+    if test in ('dirty_readonce', 'data_alias'):
+        if seen.intersection(('TX_TARGET', 'BURST_BEATS', 'DIRECTION')):
+            raise ValueError(test + ' uses fixed four-beat APB phases')
+        if base % 4096 + 112 > 4096 or base + 111 >= 1 << 44:
+            raise ValueError(test + ' requires room for seven lines in one 4KB page')
     if test == 'burst_boundary' and (base % 4096) + options['BURST_BEATS'] * 16 > 4096:
         raise ValueError('Boundary start address/length crosses 4KB')
     return test, int(mode), int(seed), options
@@ -116,6 +123,8 @@ def main():
     if include:
         flags += ['+define+ACE_V2_RUNTIME_COV', '+incdir+' + str(include)]
     fingerprint = hashlib.sha256(('\n'.join(flags) + '\n' + str(ROOT)).encode())
+    for entry in sorted(manifest['files'], key=lambda asset: asset['path']):
+        fingerprint.update((entry['path'] + '\0' + entry['sha256'] + '\n').encode())
     for path in sorted(set(sources + list((ROOT / 'dv').glob('*.sv*')) +
                            [ROOT / 'dv/sim/filelist.f', ROOT / 'dv/sim/coverage_hierarchy.cfg'])):
         fingerprint.update(path.read_bytes())

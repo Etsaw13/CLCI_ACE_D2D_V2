@@ -96,7 +96,7 @@ def runtime(path):
     return rows
 
 
-def report(directories, summary=None):
+def report(directories, summary=None, *, functional_only=False):
     merged, loaded, signature = {}, [], None
     for directory in directories:
         directory = directory.resolve()
@@ -116,7 +116,10 @@ def report(directories, summary=None):
         bins = functional(directory / 'functional_coverage.txt')
         for key, count in bins.items():
             merged[key] = merged.get(key, 0) + count
-        loaded.append((directory, metadata))
+        summaries = re.findall(r'^UVM_ACE_SUMMARY .+$', log, re.MULTILINE)
+        if len(summaries) != 1:
+            raise ValueError('Expected exactly one final transaction summary: ' + str(directory))
+        loaded.append((directory, metadata, summaries[0][len('UVM_ACE_SUMMARY '):]))
     text = ['ACE FUNCTIONAL COVERAGE | plan=ace_v2_44 | {} run(s)'.format(len(loaded)),
             '{:<11} {:<22} {:>9} {:>10}'.format('Group', 'Item', 'Hit/Plan', 'Coverage')]
     for metric in PLAN['metrics']:
@@ -133,16 +136,26 @@ def report(directories, summary=None):
     if not missing_any:
         text.append('  none')
     text += ['', 'Data mode bins count exercised configurations; data correctness is checked separately.',
-             'Cache bins require correlated before/after and response/data evidence; unmatched attempts remain diagnostic.',
-             '', 'CHECK RESULTS']
-    for directory, metadata in loaded:
-        summaries = re.findall(r'^UVM_ACE_SUMMARY .+$', (directory / 'run.log').read_text(errors='replace'), re.MULTILINE)
-        if len(summaries) != 1:
-            raise ValueError('Expected exactly one final transaction summary')
+             'Cache bins require correlated before/after and response/data evidence; unmatched attempts remain diagnostic.']
+    if functional_only:
+        total = sum(len(metric['bins']) for metric in PLAN['metrics'])
+        covered = sum(count > 0 for count in merged.values())
+        text += ['', 'TOTAL FUNCTIONAL BINS: {}/{} ({:.1f}%)'.format(covered, total, 100.0 * covered / total)]
+    else:
+        text += run_details(loaded)
+    rendered = '\n'.join(text) + '\n'
+    if summary:
+        summary.write_text(rendered)
+    print(rendered, end='')
+
+
+def run_details(loaded):
+    text = ['', 'CHECK RESULTS']
+    for directory, metadata, transaction_summary in loaded:
         text.append('  PASS (' + metadata['run_kind'] + '): ' + directory.name)
-        text.append('    ' + summaries[0][len('UVM_ACE_SUMMARY '):])
+        text.append('    ' + transaction_summary)
     text += ['', 'ACE CODE COVERAGE | master/module_a and slave/module_b only']
-    for directory, metadata in loaded:
+    for directory, metadata, _ in loaded:
         if metadata['backend'] == 'runtime':
             rows = runtime(directory / 'runtime_code_coverage.txt')
             text.append('Run: ' + directory.name)
@@ -158,22 +171,23 @@ def report(directories, summary=None):
     text += ['Window: time zero through reset, boot, traffic and final drain.',
              'Line is VCS basic-block coverage; branch is N/A in the legacy runtime API.',
              'Cross-run code-point union is not derived from aggregate counts. Preserve every coverage.vdb.']
-    rendered = '\n'.join(text) + '\n'
-    if summary:
-        summary.write_text(rendered)
-    print(rendered, end='')
+    return text
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('runs', nargs='+', type=Path)
     parser.add_argument('--summary', type=Path)
+    parser.add_argument('--functional-only', action='store_true',
+                        help='Report only functional bins, without reading per-run runtime code coverage')
     args = parser.parse_args()
     directories = [p.resolve() for p in args.runs]
     if len(set(directories)) != len(directories):
         raise ValueError('Duplicate run directory')
-    summary = args.summary or (directories[0] / 'coverage_summary.log' if len(directories) == 1 else None)
-    report(directories, summary)
+    summary = args.summary
+    if summary is None and len(directories) == 1 and not args.functional_only:
+        summary = directories[0] / 'coverage_summary.log'
+    report(directories, summary, functional_only=args.functional_only)
 
 
 if __name__ == '__main__':

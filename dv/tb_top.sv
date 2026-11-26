@@ -598,6 +598,80 @@ assign die1.RX_CLK_N    = die0.TX_CLK_N;
     $display("DV_DIRECTED_PASS test=%s UC_RS_SC=%0d CR16=%0d CR8=%0d conflicts=%0d completed=%0d",
       test_name,checks.hits[8][4],checks.hits[5][2],checks.hits[5][1],checks.cache_observer.conflict[4],checks.requests);
   endtask
+  task automatic wait_requests(input longint unsigned required);
+    realtime deadline;
+    deadline=$realtime+run_timeout_us*1us;
+    while(checks.requests<required) begin
+      @(negedge ace_clk);
+      if($realtime>=deadline) fail_test("DIRECTED_REQUEST_TIMEOUT");
+    end
+  endtask
+  task automatic dirty_readonce_case();
+    logic [43:0] dirty_address;
+    logic [127:0] expected;
+    longint unsigned prior_reads;
+    int slot;
+    dirty_address=base_argument[43:0]+44'd16;
+    slot=int'(dirty_address[5:4]);
+    expected=expected_data(dirty_address,3'(data_mode),8'(prbs_code),8'(xcode));
+    stage="dirty ReadOnce: establish UD";
+    configure_agents(2);
+    set_enable(0,1);
+    wait_requests(3); // RS, supplemental RS, RU at BASE+16
+    set_enable(0,0);settle_phase();
+    if(checks.reads!=3 || checks.hits[1][3]!=1 ||
+       u_master.c_valid[slot]!==1'b1 || u_master.c_tag[slot]!==dirty_address[43:4] ||
+       u_master.c_state[slot]!==ST_UD || u_master.c_data[slot]!==expected ||
+       u_slave.dir_valid[slot]!==1'b1 || u_slave.dir_state[slot]!==ST_UD)
+      fail_test("DIRTY_READONCE_SETUP: expected a matching dirty line after RU");
+
+    stage="dirty ReadOnce: walk four burst starts";
+    configure_agents(4);
+    prior_reads=checks.reads;
+    set_enable(0,1);
+    wait_requests(prior_reads+4); // L2, L3, L0, L1
+    set_enable(0,0);settle_phase();
+    if(checks.categories[3]<4 || u_master.c_valid[slot]!==1'b1 ||
+       u_master.c_tag[slot]!==dirty_address[43:4] ||
+       u_master.c_state[slot]!==ST_UD || u_master.c_data[slot]!==expected)
+      fail_test("DIRTY_READONCE_FAIL: nonallocating reads changed the dirty line");
+
+    stage="dirty ReadOnce: return the original data";
+    set_enable(1,1);drain();set_enable(1,0);
+    if(checks.nd[CD]!=1 || u_slave.mem_written[slot]!==1'b1 ||
+       u_slave.mem_tag[slot]!==dirty_address[43:4] || u_slave.mem[slot]!==expected)
+      fail_test("DIRTY_READONCE_FAIL: CD did not return the original line");
+    tx_target=7;
+    $display("DV_DIRTY_READONCE_PASS addr=%h data=%h",dirty_address,expected);
+  endtask
+  task automatic data_alias_case();
+    logic [43:0] target_address;
+    logic [127:0] expected;
+    int slot;
+    target_address=base_argument[43:0]+44'd16;
+    slot=int'(target_address[5:4]);
+    expected=expected_data(target_address,3'(data_mode),8'(prbs_code),8'(xcode));
+    stage="data alias: burst write";
+    configure_agents(3);
+    set_enable(0,1);wait_requests(1);
+    set_enable(0,0);settle_phase();
+    if(checks.categories[2]==0 || u_slave.mem_written[slot]!==1'b1 ||
+       u_slave.mem_tag[slot]!==target_address[43:4] || u_slave.mem[slot]!==expected)
+      fail_test("DATA_ALIAS_SETUP: burst beat 1 missing from memory");
+
+    stage="data alias: single read at the stored address";
+    base_argument=64'(target_address);
+    configure_agents(2);
+    set_enable(0,1);wait_requests(checks.requests+1);
+    set_enable(0,0);settle_phase();
+    if(checks.reads==0 || checks.categories[1]==0 ||
+       u_master.c_valid[slot]!==1'b1 || u_master.c_tag[slot]!==target_address[43:4] ||
+       u_master.c_data[slot]!==expected)
+      fail_test("DATA_ALIAS_FAIL: single read disagreed with the stored burst beat");
+    set_enable(1,1);drain();set_enable(1,0);
+    tx_target=2;
+    $display("DV_DATA_ALIAS_PASS addr=%h data=%h",target_address,expected);
+  endtask
   task automatic check_apb_results();
     transfer(0,0,12'h010,0,status_a);transfer(1,0,12'h010,0,status_b);
     if(status_a!==0 || status_b!==0) fail_test("Nonzero APB error status");
@@ -639,7 +713,8 @@ assign die1.RX_CLK_N    = die0.TX_CLK_N;
     void'($value$plusargs("SNOOP_GAP=%d",snoop_gap));void'($value$plusargs("LINK_TIMEOUT_US=%d",link_timeout_us));
     void'($value$plusargs("RUN_TIMEOUT_US=%d",run_timeout_us));void'($value$plusargs("GLOBAL_TIMEOUT_US=%d",global_timeout_us));
     void'($value$plusargs("DRAIN_TIMEOUT_CYC=%d",drain_timeout_cycles));void'($value$plusargs("PROGRESS_US=%d",progress_us));
-    if(!(test_name inside {"apb","smoke","burst_boundary","uc_rs_sc","cr_unique","cr_shared"}) || data_mode<0 || data_mode>5 ||
+    if(!(test_name inside {"apb","smoke","burst_boundary","uc_rs_sc","cr_unique","cr_shared",
+                          "dirty_readonce","data_alias"}) || data_mode<0 || data_mode>5 ||
        burst_beats<2 || burst_beats>256 || tx_target<1 || tx_target>100000 ||
        !(direction inside {"write","read"}) || base_argument[63:44]!=0 || base_argument[3:0]!=0 ||
        prbs_code<0 || prbs_code>255 || xcode<0 || xcode>255 || snoop_gap<0 || snoop_gap>255 ||
@@ -650,6 +725,10 @@ assign die1.RX_CLK_N    = die0.TX_CLK_N;
     direction_number=(direction=="read");
     if(test_name=="burst_boundary" && int'(base_argument[11:0])+burst_beats*16>4096)
       fail_test("Boundary case start address/length crosses 4KB");
+    if(test_name inside {"dirty_readonce","data_alias"})
+      if(burst_beats!=4 || int'(base_argument[11:0])+112>4096 ||
+         base_argument[43:0]>44'hfffffffff90)
+        fail_test("Fix regression requires four beats and room for seven lines");
     deadline=$realtime+link_timeout_us*1us;stable=0;
     while(stable<8) begin
       @(negedge ace_clk);
@@ -660,6 +739,8 @@ assign die1.RX_CLK_N    = die0.TX_CLK_N;
     checking=1;
     if(test_name=="apb") begin apb_case();tx_target=0;end
     else if(test_name inside {"uc_rs_sc","cr_unique","cr_shared"}) directed_cache_case();
+    else if(test_name=="dirty_readonce") dirty_readonce_case();
+    else if(test_name=="data_alias") data_alias_case();
     else begin
       scenario=(test_name=="smoke")?0:((direction_number==0)?3:4);
       stage="APB configuration";configure_agents(scenario);

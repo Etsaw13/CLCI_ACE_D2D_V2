@@ -16,7 +16,9 @@ from check_project import ROOT, check
 TESTS = ('ace_v2_apb_test', 'ace_v2_smoke_test', 'ace_v2_single_write_test',
          'ace_v2_single_read_test', 'ace_v2_burst_write_test', 'ace_v2_burst_read_test',
          'ace_v2_snoop_stress_test', 'ace_v2_pause_resume_test', 'ace_v2_error_status_test',
-         'ace_v2_uc_rs_sc_test', 'ace_v2_cr_unique_test', 'ace_v2_cr_shared_test', 'ace_v2_data_alias_diag_test')
+         'ace_v2_uc_rs_sc_test', 'ace_v2_cr_unique_test', 'ace_v2_cr_shared_test',
+         'ace_v2_dirty_readonce_test', 'ace_v2_data_alias_test', 'ace_v2_data_alias_diag_test')
+FIX_TARGETS = {'ace_v2_dirty_readonce_test': 7, 'ace_v2_data_alias_test': 2}
 LIMITS = {
     'TX_TARGET': (1, 100000), 'BURST_BEATS': (2, 256), 'PRBS_CODE': (0, 255),
     'XCODE': (0, 255), 'SNOOP_GAP': (0, 255), 'LINK_TIMEOUT_US': (1, 100000),
@@ -32,8 +34,8 @@ def arguments(argv):
         print('Numeric keys: ' + ', '.join(LIMITS))
         print('Other keys: +BASE_ADDR=<hex> +APB_TRACE')
         print('Default: ace_v2_smoke_test, mode=0, seed=1, TX_TARGET=64, BURST_BEATS=4.')
-        print('Twelve regular tests; data_alias_diag is a separate non-normal diagnostic.')
-        print('Coverage cases use fixed phases: uc_rs_sc target minimum=2, cr_shared=3, cr_shared=3, cr_unique=6; SNOOP_GAP=255.')
+        print('Cache cases use fixed phases: uc_rs_sc target minimum=2, cr_shared=3, cr_unique=6; SNOOP_GAP=255.')
+        print('dirty_readonce and data_alias use fixed four-beat phases; omit TX_TARGET and BURST_BEATS.')
         print('Environment: CHECK_ONLY, COVERAGE, COV_BACKEND, VCS_BIN, VCS_INCLUDE, PYTHON_BIN, UVM_VERBOSITY.')
         sys.exit(0)
     test = argv[0] if argv else 'ace_v2_smoke_test'
@@ -44,6 +46,8 @@ def arguments(argv):
     if not re.fullmatch('[0-9]{1,10}', seed) or not 1 <= int(seed) <= 2147483647:
         raise ValueError('Seed must be 1..2147483647')
     options = {'TX_TARGET': 64, 'BURST_BEATS': 4}
+    if test in FIX_TARGETS:
+        options['TX_TARGET'] = FIX_TARGETS[test]
     if test == 'ace_v2_snoop_stress_test':
         options['SNOOP_GAP'] = 0
     if test in ('ace_v2_uc_rs_sc_test', 'ace_v2_cr_unique_test', 'ace_v2_cr_shared_test'):
@@ -93,13 +97,17 @@ def arguments(argv):
     if test == 'ace_v2_data_alias_diag_test' and beats != 4:
         raise ValueError('The alias diagnostic uses exactly four write beats')
     base = int(str(options.get('BASE_ADDR', '20000000')), 16)
-    if test in ('ace_v2_smoke_test', 'ace_v2_pause_resume_test'):
+    if test in FIX_TARGETS and seen.intersection(('TX_TARGET', 'BURST_BEATS')):
+        raise ValueError(test + ' uses fixed four-beat APB phases')
+    if test in FIX_TARGETS or test == 'ace_v2_data_alias_diag_test':
+        span = 112
+    elif test in ('ace_v2_smoke_test', 'ace_v2_pause_resume_test'):
         span = 48 + beats * 16
     elif test == 'ace_v2_burst_read_test':
         if beats >= 254 and target != 1:
             raise ValueError('254..256 beat reads require TX_TARGET=1; automatic start-line rotation can cross 4KB')
         span = (48 if target > 1 else 0) + beats * 16
-    elif test in ('ace_v2_burst_write_test', 'ace_v2_data_alias_diag_test'):
+    elif test == 'ace_v2_burst_write_test':
         span = beats * 16
     else:
         span = 64
@@ -145,6 +153,8 @@ def main():
     if include:
         flags += ['+define+ACE_V2_UVM_RUNTIME_COV', '+incdir+' + str(include)]
     fingerprint = hashlib.sha256(('\n'.join(flags) + '\n' + str(ROOT)).encode())
+    for entry in sorted(manifest['files'], key=lambda asset: asset['path']):
+        fingerprint.update((entry['path'] + '\0' + entry['sha256'] + '\n').encode())
     for path in sorted(set(sources + list((ROOT / 'uvm').glob('*.sv*')) +
                            [ROOT / 'uvm/sim/filelist.f', ROOT / 'uvm/sim/coverage_hierarchy.cfg'])):
         fingerprint.update(path.read_bytes())

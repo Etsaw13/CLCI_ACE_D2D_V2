@@ -36,7 +36,7 @@ export VCS_INCLUDE=/eda/synopsys/V-2023.12-SP2/include
 | ace_v2_snoop_stress_test | 单拍读，默认 gap=0，至少 4 次 AC 且有 CD；仍与主读并行 |
 | ace_v2_pause_resume_test | 停发、Home 排空、配置/计数保持、恢复及序列连续 |
 | ace_v2_error_status_test | BRESP/CR 两轮注入、指定错误锁存、清除、计数分段和恢复；结果单列 |
-| ace_v2_data_alias_diag_test | 另列的同地址不同拍位置数据诊断，不属于上述九类正常/负向功能入口 |
+| ace_v2_data_alias_diag_test | 兼容旧命令的同地址重读诊断入口，报告单列 |
 
 ```bash
 bash uvm/sim/run.sh ace_v2_single_write_test 0 1 +TX_TARGET=64
@@ -47,9 +47,24 @@ bash uvm/sim/run.sh ace_v2_snoop_stress_test 0 1 +TX_TARGET=128 +SNOOP_GAP=0
 bash uvm/sim/run.sh ace_v2_pause_resume_test 0 1 +TX_TARGET=64 +PAUSE_AT=24 +PAUSE_CYCLES=200
 bash uvm/sim/run.sh ace_v2_error_status_test 0 1 +TX_TARGET=64 +ERROR_TARGET=8
 
-# 单独诊断，发现真实矛盾会返回失败，不自动算 XFAIL
+# 兼容旧命令的独立诊断入口
 bash uvm/sim/run.sh ace_v2_data_alias_diag_test 0 1
 ```
+
+## ACE 修复回归
+
+```bash
+# 先在目标服务器跑两项新增的 UVM 定向测试
+COVERAGE=0 bash uvm/sim/regression.sh data_integrity
+
+# 单独跑，也可将模式 2 换成其他数据模式
+COVERAGE=0 bash uvm/sim/run.sh ace_v2_dirty_readonce_test 2 1
+COVERAGE=0 bash uvm/sim/run.sh ace_v2_data_alias_test 2 1
+```
+
+- `ace_v2_dirty_readonce_test` 先建立 UD 脏行，再用 burst ReadOnce 访问该地址，最后开启 Home，核对 CD 回传和 B 的内存数据。通过时打印 `UVM_ACE_DIRTY_READONCE_PASS`。
+- `ace_v2_data_alias_test` 把 burst 第 2 拍写入 B，再从该地址做单拍读。检查存储数据、读回数据、缓存和两端错误状态。通过时打印 `UVM_ACE_DATA_ALIAS_PASS`。
+- 两项都是普通测试，固定使用 4 拍和预定 APB 阶段。运行时省略 `TX_TARGET` 和 `BURST_BEATS`。如需修改 `BASE_ADDR`，需 16 字节对齐，且从该地址开始的七行位于同一个 4 KB 页。
 
 ## 所有参数
 
@@ -98,20 +113,43 @@ COV_BACKEND=collect bash uvm/sim/run.sh ace_v2_smoke_test 0 1
 ## 回归
 
 ```bash
-# 六种数据模式，每次独立仿真
-bash uvm/sim/regression.sh smoke
+# 查看分组和 all 将运行的参数，无需 VCS
+bash uvm/sim/regression.sh --list
+bash uvm/sim/regression.sh all --list
 
-# 八个无注入入口，不含错误测试与诊断
-bash uvm/sim/regression.sh directed
-
-# 双方向，2/3/4/5/8/16/255/256拍，各次TX_TARGET=1
-bash uvm/sim/regression.sh boundary
-
-# 独立运行注入、清除、恢复测试
-bash uvm/sim/regression.sh negative
+# 运行完整回归，默认采集并合并功能和代码覆盖率
+bash uvm/sim/regression.sh all
 ```
 
-所有回归失败即停止。诊断不默认加入通过率回归。
+| 分组 | 次数 | 测试内容 |
+|---|---:|---|
+| `basic` | 7 | APB、单拍读写、持续 burst 读写、snoop 压力、暂停恢复 |
+| `smoke` | 6 | 混合读写与 snoop 并行，数据模式 0–5 各一次 |
+| `burst_boundary` | 16 | 2、3、4、5、8、16、255、256 拍，读写各一次，每次 `TX_TARGET=1` |
+| `cache_snoop` | 2 | `cr_unique`（含 UC→SC 检查）与 `cr_shared` |
+| `data_integrity` | 2 | 脏行 ReadOnce 与跨 burst 拍位置读回 |
+| `error_recovery` | 1 | 错误注入、状态清除和业务恢复 |
+| `coverage_targets` | 24 | `smoke`、`cache_snoop`、`burst_boundary` |
+| `all` | 34 | 前六组各跑一次 |
+
+不指定分组时运行 `smoke`。旧入口仍可用，`directed`、`cache`、`coverage` 分别保留原来的 8、3、25 次运行，`boundary`、`fixes`、`negative` 分别对应 `burst_boundary`、`data_integrity`、`error_recovery`。
+
+### 查看本批结果
+
+单项失败后，回归会继续执行后续测试。结束时控制台打印逐项结果、两种覆盖率汇总状态和 `REGRESSION_SUMMARY`。退出码为 0 表示各项检查和本批适用的覆盖率汇总均通过。`NOT_RUN` 表示对应阶段没有完成，编译错误等详情可在该项日志中查找。
+
+本批报告位于 `uvm/out/regression/<分组_时间_标识>/`。
+
+| 文件 | 内容 |
+|---|---|
+| `summary.txt` | 逐项仿真和报告结果、功能覆盖率及代码覆盖率汇总 |
+| `cases/*.log` | 每项运行的完整控制台记录，含 `RUN_DIR`（若已创建） |
+| `functional_coverage.txt` | 功能 bin 并集和未覆盖项 |
+| `code_coverage/index.html` | VDB 逐点合并报告，可查看 ACE 源码覆盖 |
+
+自动合并只读取本批仿真通过的普通测试。错误注入仍计入通过/失败表，并保留它自己的运行目录与报告。已有 `uvm/out` 可以保留。两种覆盖率分别校验，输入缺失或损坏时，相应汇总标记 `FAIL` 并给出原因。
+
+设置 `COVERAGE=0` 时仍合并功能覆盖。`COV_BACKEND=collect` 会保留 VDB，自动代码并集需要默认的 `runtime` 后端。`CHECK_ONLY=1` 只检查参数和依赖，汇总中不会记作仿真通过。
 
 ## 如何判断结果
 
@@ -136,7 +174,7 @@ python3 uvm/sim/report.py uvm/out/实际目录1 uvm/out/实际目录2 --summary 
 
 错误测试和诊断单独报告，禁止并入普通覆盖。功能覆盖按bin命中并集，不平均百分比；原报告器的代码覆盖仍分次列出。跨测试代码点并集另用下述 `merge_code_coverage.sh`。两个ACE实例合计使用分子/分母加权；branch实时查询显示N/A，原始VDB应保留。
 
-### 一次汇总全部 UVM 运行
+### 手动汇总已有 UVM 运行
 
 ```bash
 bash uvm/sim/merge_coverage.sh
@@ -180,32 +218,15 @@ bash uvm/sim/run.sh ace_v2_uc_rs_sc_test 0 1
 bash uvm/sim/run.sh ace_v2_cr_unique_test 0 1
 bash uvm/sim/run.sh ace_v2_cr_shared_test 0 1
 
-# 只运行上面三个用例，模式0，各自独立仿真
-bash uvm/sim/regression.sh cache
+# 运行 cr_unique 和 cr_shared，cr_unique 同时检查 UC→SC
+bash uvm/sim/regression.sh cache_snoop
 
-# 六种模式smoke + 三个缓存定向 + 十六项读写burst边界，共25次
-bash uvm/sim/regression.sh coverage
+# 六种模式 smoke、两个缓存定向、十六项读写 burst 边界，共 24 次
+bash uvm/sim/regression.sh coverage_targets
 ```
 
 这些固定流程不接受显式 `+TX_TARGET`、`+BURST_BEATS`；DV 也不接受 `+DIRECTION`。Home 间隔固定为 255，显式其他 `+SNOOP_GAP` 会拒绝。仍可选择模式、seed、BASE、PRBS_CODE、XCODE 和超时。请求下限来自各流程，APB 停发前已经接受的额外任务也全部检查，不能把日志截成固定笔数。
 
 每个定向阶段检查实际通道与 ACK 排空、缓存和 Home 目录的 tag/state、独立预期数据及 Home 存储。指定 CR 和缓存行为未出现、出现额外 snoop/CD、状态不符或关联冲突均失败。旧 smoke、压力和普通定向流量继续并行；这三个隔离前置状态的用例只证明具体功能可达，不证明并发竞争已经修复。
 
-### 新旧验证版本的结果分开保存
-
-本批改变了验证源码，旧结果的 `verification_checksums` 与新版本不同。两种合并器都继续拒绝混合验证版本；不要修改旧 run.json 校验值来强行合并。旧 VDB 和报告应保留。
-
-建议在运行本批前，将已有 `uvm/out` 移到工程外的历史目录，再运行上面的 `coverage` 回归和合并。下面仅移动历史结果，不删除它们；从工程根目录执行一次：
-
-```bash
-stamp=$(date +%Y%m%d_%H%M%S)
-if [ -d uvm/out ]; then
-  mv uvm/out "../CLCI_ACE_D2D_V2_uvm_out_before_${stamp}"
-fi
-
-bash uvm/sim/regression.sh coverage
-bash uvm/sim/merge_coverage.sh
-bash uvm/sim/merge_code_coverage.sh
-```
-
-不要在已有仿真运行时移动输出。25 次回归沿用原覆盖判据，不保证所有安装、时序与配置都自动达到 44/44；未命中仍如实列出。新增测试的本地检查范围见 [检查记录](VALIDATION.md)，未修改的 RTL 中已复现问题见 [RTL 审核](rtl_review.md)。本批新增用例仍需 s206 的真实 VCS/CLCI 验证。
+手动合并跨批次历史结果时，先选择相同设计和验证版本的运行目录。合并器按源码和验证文件校验值检查兼容性。仿真通过后仍需查看覆盖报告中的 `NOT COVERED`。相关检查记录见 [验证记录](VALIDATION.md) 和 [RTL 审核](rtl_review.md)。

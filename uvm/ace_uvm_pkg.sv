@@ -53,6 +53,10 @@ package ace_uvm_pkg;
         if(snoop_gap!=255 || tx_target!=((kind=="ace_v2_uc_rs_sc_test")?2:(kind=="ace_v2_cr_shared_test")?3:6))
           `uvm_fatal("DIRECTED_ARGS","Coverage cases require fixed TX_TARGET=2/3/6 and SNOOP_GAP=255")
       end
+      if(kind inside {"ace_v2_dirty_readonce_test","ace_v2_data_alias_test","ace_v2_data_alias_diag_test"}) begin
+        if(burst_beats!=4 || int'(wide_address[11:0])+112>4096 || wide_address>64'hfffffffff90)
+          `uvm_fatal("FIX_ARGS","Fix cases require four beats and room for seven lines in one 4KB page")
+      end
       if(pause_at==0) pause_at=(tx_target>2)?tx_target/2:1;
     endfunction
   endclass

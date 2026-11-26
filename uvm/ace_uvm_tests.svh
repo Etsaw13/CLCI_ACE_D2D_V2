@@ -59,6 +59,8 @@ endclass
 `ACE_V2_TEST(ace_v2_uc_rs_sc_test)
 `ACE_V2_TEST(ace_v2_cr_unique_test)
 `ACE_V2_TEST(ace_v2_cr_shared_test)
+`ACE_V2_TEST(ace_v2_dirty_readonce_test)
+`ACE_V2_TEST(ace_v2_data_alias_test)
 // Separate diagnostic, excluded from normal coverage merging.
 `ACE_V2_TEST(ace_v2_data_alias_diag_test)
 `undef ACE_V2_TEST

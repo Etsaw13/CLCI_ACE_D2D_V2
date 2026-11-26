@@ -1,7 +1,7 @@
 // =====================================================================
 // ace_funcs.svh - 模块内插入的公共函数 (include 方式, iverilog 兼容)
 // 用法: 在 module 体内 `include "ace_funcs.svh"
-//       (依赖端口 cfg_data_mode / cfg_prbs_code / cfg_xcode)
+//       数据模式、种子和固定字节均由调用方显式传入
 // 注意: 1) 支持 PRBS31/23/10，分别使用
 //          x^31+x^28+1、x^23+x^18+1、x^10+x^7+1
 //       2) 本文件**不加 include guard**——需要每个模块各展开一份
@@ -74,11 +74,6 @@
   // mode 属公共约定参数 (同 cfg_prbs_code), A/B 两侧必须同配
   // =====================================================================
 
-  // mode=1 全同字节: cfg_xcode 复制铺满 128b (抓信号线粘 0/粘 1)
-  function automatic logic [DATA_W-1:0] pat_xcode();
-    pat_xcode = {16{cfg_xcode}};
-  endfunction
-
   // mode=2 行地址序列号: 4 个 32b lane，每个 lane 携带物理行身份
   //   (抓数据送错行/拍序错乱; lane 内不放长串零, 避免高位粘 0 被期望值掩盖)
   function automatic logic [DATA_W-1:0] pat_seq(logic [TAG_W-1:0] line);
@@ -90,13 +85,16 @@
     pat_walk1 = {{(DATA_W-1){1'b0}}, 1'b1} << line[6:0];
   endfunction
 
-  // 某物理行的期望数据: 按 cfg_data_mode 分发 (A/B 两侧同公式)
+  // 某物理行的期望数据: 按 mode 分发 (A/B 两侧同公式)
   // 0=PRBS31, 1=xcode, 2=sequence, 3=walking-1, 4=PRBS23, 5=PRBS10
-  function automatic logic [DATA_W-1:0] line_data(logic [TAG_W-1:0] line);
+  function automatic logic [DATA_W-1:0] line_data(logic [TAG_W-1:0] line,
+                                                  logic [2:0] mode,
+                                                  logic [7:0] code,
+                                                  logic [7:0] fixed_byte);
     logic [30:0] seed31;
-    seed31 = prbs_seed(line, cfg_prbs_code);
-    case (cfg_data_mode)
-      3'd1:    line_data = pat_xcode();
+    seed31 = prbs_seed(line, code);
+    case (mode)
+      3'd1:    line_data = {16{fixed_byte}};
       3'd2:    line_data = pat_seq(line);
       3'd3:    line_data = pat_walk1(line);
       3'd4:    line_data = prbs23_128(seed31[22:0]);

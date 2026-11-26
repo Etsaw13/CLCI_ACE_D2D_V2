@@ -54,16 +54,19 @@ class ace_v2_control_sequence extends uvm_sequence#(ace_v2_apb_item);
     read_expect(0,12'h010,a);read_expect(1,12'h010,b);
   endtask
   task run_until(input longint unsigned target);
-    realtime deadline;
     cfg.stage="parallel traffic";enable(1,1);enable(0,1);
-    deadline=$realtime+cfg.run_timeout_us*1us;
-    while(cfg.engine.requests<target) begin
-      @(negedge cfg.vif.clk);if($realtime>=deadline) `uvm_fatal("RUN_TIMEOUT","Request target not reached")
-    end
+    wait_requests(target);
     $display("UVM_ACE_STOP target_min=%0d issued=%0d t=%0t",target,cfg.engine.requests,$time);
     enable(0,0);
     $display("UVM_ACE_STOP_APPLIED issued=%0d t=%0t",cfg.engine.requests,$time);
     total_min=target;
+  endtask
+  task wait_requests(input longint unsigned target);
+    realtime deadline;
+    deadline=$realtime+cfg.run_timeout_us*1us;
+    while(cfg.engine.requests<target) begin
+      @(negedge cfg.vif.clk);if($realtime>=deadline) `uvm_fatal("RUN_TIMEOUT","Request target not reached")
+    end
   endtask
   task drain();
     int stable;stable=0;cfg.stage="drain; Home remains enabled";
@@ -138,13 +141,74 @@ class ace_v2_control_sequence extends uvm_sequence#(ace_v2_apb_item);
     enable(1,0);write_reg(1,12'h008,32'(cfg.snoop_gap));clear_errors();
     cfg.stage="CR recovery";run_until(cfg.engine.requests+cfg.error_target);drain();check_status();check_counts();cfg.recovery_phases++;
   endtask
-  task alias_diagnostic();
-    cfg.stage="diagnostic: burst write then same address at another beat position";
-    configure(3);run_until(1);drain();check_status();check_counts();enable(1,0);
-    cfg.base_address+=44'd16;
-    configure(2);run_until(cfg.engine.requests+1);drain();
-    // The checker uses stored beat-1 data. A's own beat-0 expectation must
-    // still be checked; disagreement remains an actual failing diagnostic.
+  task check_home_word(input logic [43:0] address,input logic [127:0] expected);
+    int slot;
+    slot=internal_cache_slot(address);
+    if(cfg.vif.memory_written[slot]!==1'b1 ||
+       cfg.vif.memory_tag[slot]!==address[43:4] ||
+       cfg.vif.memory_data[slot]!==expected)
+      `uvm_fatal("FIX_HOME_DATA",$sformatf("addr=%h expected=%h actual=%h",
+        address,expected,cfg.vif.memory_data[slot]))
+  endtask
+  task data_alias_case();
+    logic [43:0] address;
+    logic [127:0] expected;
+    int slot;
+    address=cfg.base_address+44'd16;
+    slot=internal_cache_slot(address);
+    expected=expected_data(address,3'(cfg.mode),8'(cfg.prbs_code),8'(cfg.xcode));
+    cfg.stage="data alias: burst write";
+    configure(3);
+    enable(0,1);wait_requests(1);enable(0,0);drain_idle();
+    if(cfg.engine.categories[2]==0)
+      `uvm_fatal("DATA_ALIAS_SETUP","No completed burst write")
+    check_home_word(address,expected);
+
+    cfg.stage="data alias: single read of the stored burst beat";
+    cfg.base_address=address;
+    configure(2);
+    enable(0,1);wait_requests(cfg.engine.requests+1);enable(0,0);drain_idle();
+    if(cfg.engine.categories[1]==0 || cfg.vif.cache[slot].valid!==1'b1 ||
+       cfg.vif.cache[slot].tag!==address[43:4] || cfg.vif.cache[slot].data!==expected)
+      `uvm_fatal("DATA_ALIAS_FAIL","Single read disagreed with the stored burst beat")
+    enable(1,1);drain();enable(1,0);
+    check_status();check_counts();
+    total_min=2;
+    $display("UVM_ACE_DATA_ALIAS_PASS addr=%h data=%h",address,expected);
+  endtask
+  task dirty_readonce_case();
+    logic [43:0] address;
+    logic [127:0] expected;
+    longint unsigned prior_reads;
+    int slot;
+    address=cfg.base_address+44'd16;
+    slot=internal_cache_slot(address);
+    expected=expected_data(address,3'(cfg.mode),8'(cfg.prbs_code),8'(cfg.xcode));
+    cfg.stage="dirty ReadOnce: establish UD";
+    configure(2);
+    enable(0,1);wait_requests(3);enable(0,0);drain_idle();
+    if(cfg.engine.reads!=3 || cfg.engine.hits[1][3]!=1 ||
+       !internal_cache_has(cfg.vif.cache[slot],address,ST_UD) ||
+       cfg.vif.cache[slot].data!==expected || cfg.vif.directory_valid[slot]!==1'b1 ||
+       cfg.vif.directory_tag[slot]!==address[43:4] || cfg.vif.directory_state[slot]!==ST_UD)
+      `uvm_fatal("DIRTY_READONCE_SETUP","Expected a matching dirty line after ReadUnique")
+
+    cfg.stage="dirty ReadOnce: walk four burst starts";
+    configure(4);
+    prior_reads=cfg.engine.reads;
+    enable(0,1);wait_requests(prior_reads+4);enable(0,0);drain_idle();
+    if(cfg.engine.categories[3]<4 || !internal_cache_has(cfg.vif.cache[slot],address,ST_UD) ||
+       cfg.vif.cache[slot].data!==expected)
+      `uvm_fatal("DIRTY_READONCE_FAIL","Nonallocating reads changed the dirty line")
+
+    cfg.stage="dirty ReadOnce: return the original data";
+    enable(1,1);drain();enable(1,0);
+    if(cfg.engine.nd[CD]!=1)
+      `uvm_fatal("DIRTY_READONCE_FAIL","Home must receive exactly one dirty-data transfer")
+    check_home_word(address,expected);
+    check_status();check_counts();
+    total_min=7;
+    $display("UVM_ACE_DIRTY_READONCE_PASS addr=%h data=%h",address,expected);
   endtask
   // These two cases deliberately separate state construction from snoops.
   // All requests still come from the ACE generator and traverse real CLCI.
@@ -290,7 +354,8 @@ class ace_v2_control_sequence extends uvm_sequence#(ace_v2_apb_item);
       "ace_v2_cr_unique_test":coverage_case(1);
       "ace_v2_pause_resume_test":pause_case();
       "ace_v2_error_status_test":error_case();
-      "ace_v2_data_alias_diag_test":alias_diagnostic();
+      "ace_v2_data_alias_test","ace_v2_data_alias_diag_test":data_alias_case();
+      "ace_v2_dirty_readonce_test":dirty_readonce_case();
       default:begin
         scenario=(cfg.kind=="ace_v2_single_write_test")?1:
                  (cfg.kind inside {"ace_v2_single_read_test","ace_v2_snoop_stress_test"})?2:

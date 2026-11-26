@@ -11,3 +11,5 @@ core.*
 
 # Local CLCI dependencies; supplied separately.
 /clci/
+docs/*.drawio
+docs/*.docx

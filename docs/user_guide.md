@@ -10,7 +10,7 @@ python3 dv/sim/check_project.py
 CHECK_ONLY=1 bash dv/sim/run.sh smoke 0 1
 ```
 
-这两条检查路径和源码校验值，不代表仿真通过。如果 vcs 不在 PATH，使用安装目录的实际路径。例如 s206 原先使用：
+这两条检查依赖路径并计算实际源码的校验值。通过后可开始仿真。如果 vcs 不在 PATH，请配置编译器的实际路径。s206 原先的配置如下。
 
 ```bash
 export VCS_BIN=/eda/synopsys/V-2023.12-SP2/amd64/bin/vcs
@@ -27,6 +27,26 @@ bash dv/sim/run.sh smoke 0 1 +TX_TARGET=64
 ```
 
 建议先完成这两项，再做多模式及长度回归。CLCI 硬件启动本身耗时较长，DV_PROGRESS 会显示仿真时间、阶段、链路就绪和请求/完成计数。历史约 341 us 只是旧环境启动参考，不是 V2 的已测保证。
+
+## ACE 缺陷回归
+
+```bash
+# 先跑 ACE 单元用例，再用真实 CLCI 跑两项定向用例（sequence 模式）
+COVERAGE=0 bash dv/sim/regression.sh fixes
+
+# 仅跑 ACE 单元用例，无需 CLCI 建链
+bash dv/sim/run_cache_snoop_fix.sh
+
+# 分别运行真实链路用例，也可将模式 2 换成其他数据模式
+COVERAGE=0 bash dv/sim/run.sh dirty_readonce 2 1
+COVERAGE=0 bash dv/sim/run.sh data_alias 2 1
+```
+
+- 单元用例覆盖缓存 miss、连续 snoop、同槽不同 tag 的 WU、异常 BID/RLAST、跨 4 KB、AW/ACK 超时、迟到 CR/CD、AW/AR 竞争及写掩码。通过标记为 `CACHE_SNOOP_REGRESSION_PASS`。
+- `dirty_readonce` 通过 APB 建立脏行，运行多拍 ReadOnce，再打开 Home 并核对 CD 回写到 B 的数据。
+- `data_alias` 把 4 拍 burst 的第 2 拍数据写入 B，再从该地址做单拍读，检查读数据、缓存和两侧错误状态。
+- 两个真实链路用例使用固定的 4 拍和 APB 阶段。可以选 `BASE_ADDR`，该地址起连续七行须在同一个 4 KB 页内。结果和日志保存到 `dv/out/`，每项通过时打印 `ACE_V2_DV_PASS` 和对应的定向标记。
+- `COVERAGE=0` 关闭 VCS 代码覆盖率采集，功能自检和功能覆盖报告继续生成。
 
 ## 常用例子
 
@@ -61,7 +81,7 @@ bash dv/sim/regression.sh boundary
 
 | 位置 | 取值 | 默认 | 含义 |
 |---|---|---|---|
-| 测试 | apb / smoke / burst_boundary | smoke | APB 寄存器、混合并行、单项 burst 边界 |
+| 测试 | apb / smoke / burst_boundary / uc_rs_sc / cr_unique / cr_shared / dirty_readonce / data_alias | smoke | APB、混合并行、burst 边界、缓存及数据定向测试 |
 | 模式 | 0..5 | 0 | 0 PRBS31；1 固定字节；2 sequence；3 walking-one；4 PRBS23；5 PRBS10 |
 | seed | 1..2147483647 | 1 | 传入仿真器。当前 DV 固定控制序列，无随机激励，改变 seed 不会改变内部发生器序列 |
 

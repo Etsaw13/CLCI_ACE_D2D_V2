@@ -5,8 +5,8 @@
 ```bash
 bash uvm/sim/run.sh ace_v2_apb_test 0 1
 bash uvm/sim/run.sh ace_v2_smoke_test 0 1 +TX_TARGET=64
-bash uvm/sim/merge_coverage.sh
-bash uvm/sim/merge_code_coverage.sh
+bash uvm/sim/regression.sh --list
+bash uvm/sim/regression.sh all
 ```
 
 - [运行方法、全部测试和参数](../docs/uvm_user_guide.md)
@@ -15,8 +15,8 @@ bash uvm/sim/merge_code_coverage.sh
 - [跨测试代码覆盖率合并与源码查看](../docs/code_coverage.md)
 - [检查证据与限制](../docs/VALIDATION.md)
 
-九类测试已实现，另有独立的数据别名诊断。实际 VCS/UVM 调度与真实 CLCI 链路仍须在目标服务器验证；本机和 myserver 都没有 VCS。
+实际 VCS/UVM 与真实 CLCI 联合仿真在目标服务器运行。本机和 myserver 可执行参数及依赖检查。
 
-`merge_coverage.sh` 合并功能覆盖并单列负向/诊断结果；`merge_code_coverage.sh` 只对普通通过运行做 VDB 逐点并集，结果写入本环境的 `out/code_coverage/`。原生格式适配的目标实测状态见上述使用说明。
+`all` 共启动 34 次仿真，完成后将逐项结果和覆盖率汇总写入 `uvm/out/regression/<批次>/summary.txt`。默认自动生成 ACE 源码覆盖视图，入口为同批次的 `code_coverage/index.html`。
 
-新增缓存/CR定向用例：`bash uvm/sim/regression.sh cache`；完整功能覆盖回归：`bash uvm/sim/regression.sh coverage`（25次）。本批新增验证源码与历史输出的版本校验值不同，运行前的输出归档和具体流程见对应运行说明。RTL审核见 [rtl_review.md](../docs/rtl_review.md)。
+`cache_snoop` 运行两个缓存定向用例，`coverage_targets` 运行 24 次覆盖回归。手动分析已有运行时，可用 `merge_coverage.sh` 和 `merge_code_coverage.sh`。参数和统计范围见 [UVM 运行说明](../docs/uvm_user_guide.md)。

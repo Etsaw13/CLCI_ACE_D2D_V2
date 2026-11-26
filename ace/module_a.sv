@@ -359,11 +359,14 @@ module module_a (
   assign main_alloc = rack && (arsnoop_l == ARSNOOP_READ_SHARED ||
                                arsnoop_l == ARSNOOP_READ_UNIQUE);
   logic                       main_upd_en;
-  logic                       main_upd_vld;
   logic [1:0]                 main_upd_st;
   logic [TAG_W-1:0]           main_upd_tag;
   logic [IDX_W-1:0]           main_upd_idx;
   logic                       r_pd_l, r_is_l;   // 读最后拍锁存的 RRESP 属性位
+  logic [DATA_W-1:0]          completed_data;
+  logic                       main_invalidate;
+  logic [TAG_W-1:0]           write_end_line;
+  logic                       read_frame_bad;
 
   // 槽位 = 行号低 2 位 (连续赋值计算, 规避 always 块内位选择的工具限制)
   logic [IDX_W-1:0] ar_slot;
@@ -375,8 +378,7 @@ module module_a (
     main_lk_addr = main_alloc ? ar_line_l : ord_line_l;
     // 直接映射: 槽位 = 行号低 2 位 (与 B 目录同构, 无逐出)
     main_upd_idx = main_alloc ? ar_slot : ord_line_l[IDX_W-1:0];
-    main_upd_en  = main_alloc || wack;               // 读: 分配; 写: 作废或保留
-    main_upd_vld = main_alloc || (wack && ord_awsn_l == AWSNOOP_WRITE_LINE_UNIQUE);
+    main_upd_en  = main_alloc || (wack && ord_awsn_l == AWSNOOP_WRITE_LINE_UNIQUE);
     // 读填充: RU 按 PassDirty 落 UD / RS 按 IsShared 落 SC / 其余 UC;
     // 写: WLU 完成→UC (直写式, 数据已照进内存); WU 完成→作废 (vld=0)
     main_upd_st  = main_alloc ? ((arsnoop_l == ARSNOOP_READ_UNIQUE)
@@ -385,15 +387,22 @@ module module_a (
                               : ST_UC;
     main_upd_tag = main_alloc ? ar_line_l : ord_line_l;
   end
+  assign main_invalidate = wack && ord_awsn_l == AWSNOOP_WRITE_UNIQUE;
+  assign write_end_line = ord_line_l + TAG_W'(ord_len_l);
 
   // ---- 读最后拍锁存 RRESP 属性位 (v2 的 rack 延迟一拍, rack 拍不能再采 rresp) ----
   always_ff @(posedge aclk or negedge areset_n) begin
     if (!areset_n) begin
       r_pd_l <= 1'b0;
       r_is_l <= 1'b0;
-    end else if (rvalid && rready && (st == M_R_R) && (rid == ar_id_c)) begin
+      completed_data <= '0;
+    end else if (rvalid && rready && (st == M_R_R) && (rid == ar_id_c) &&
+                 rlast && (main_beat_cnt == ord_len_l)) begin
       r_pd_l <= rresp[RR_PASSDIRTY];
       r_is_l <= rresp[RR_ISSHARED];
+      completed_data <= rdata;
+    end else if (wvalid && wready && wlast) begin
+      completed_data <= wdata;
     end
   end
 
@@ -408,6 +417,7 @@ module module_a (
   logic [1:0]                 sn_upd_st_l;
   logic [IDX_W-1:0]           sn_idx_l;
   logic [TAG_W-1:0]           sn_tag_l;
+  logic [DATA_W-1:0]          sn_data_l;
   logic                       sn_upd_fire;   // 单拍脉冲: CR 应答接受时刻
 
   always_ff @(posedge aclk or negedge areset_n) begin
@@ -419,25 +429,21 @@ module module_a (
         c_data[i]  <= '0;
       end
     end else begin
-      // 快照写入 (独立于状态更新, 目标数组不同):
-      //   写 W 拍 ← wdata (WLU 完成: 行保留 UC + 快照刷新)
-      //   读最后拍 ← rdata (RS/RU 填充: 行落 UD/SC/UC + 快照)
-      if ((st == M_W_W) && wvalid && wready)
-        c_data[ord_line_l[IDX_W-1:0]] <= wdata;
-      if (rvalid && rready && (st == M_R_R) && (rid == ar_id_c))
-        c_data[ar_slot] <= rdata;
-      // A snoop miss has no cache side effect. Use the update-enable sampled
-      // with AC so a miss cannot evict another tag in the same cache slot.
-      if (sn_upd_fire && sn_upd_en_l) begin
-        c_valid[sn_idx_l] <= sn_upd_vld_l;
-        c_tag[sn_idx_l]   <= sn_tag_l;
-        c_state[sn_idx_l] <= sn_upd_st_l;
-      end
-      // 注: sn_upd_fire 为单拍脉冲, 不与主事务更新长期抢占
-      else if (main_upd_en) begin
-        c_valid[main_upd_idx] <= main_upd_vld;
-        c_tag[main_upd_idx]   <= main_upd_tag;
-        c_state[main_upd_idx] <= main_upd_st;
+      for (int i = 0; i < N_LINES; i++) begin
+        if (main_upd_en && main_upd_idx == IDX_W'(i)) begin
+          c_valid[i] <= 1'b1;
+          c_tag[i]   <= main_upd_tag;
+          c_state[i] <= main_upd_st;
+          c_data[i]  <= completed_data;
+        end else if (main_invalidate && c_valid[i] &&
+                     c_tag[i] >= ord_line_l && c_tag[i] <= write_end_line) begin
+          c_valid[i] <= 1'b0;
+          c_state[i] <= ST_I;
+        end else if (sn_upd_fire && sn_upd_en_l && sn_idx_l == IDX_W'(i) &&
+                     c_valid[i] && c_tag[i] == sn_tag_l) begin
+          c_valid[i] <= sn_upd_vld_l;
+          c_state[i] <= sn_upd_st_l;
+        end
       end
     end
   end
@@ -450,8 +456,12 @@ module module_a (
   // Do not accept a main transaction while an AC/CR snoop is in progress.
   // This prevents a response to the same cache line before CR completion.
   // CD 挂起期间同样不接单: 新写单可能改写待交数据所在槽位的快照.
-  assign ord_ready = (st == M_IDLE) && cfg_en && !rack && !wack &&
-                     !acvalid && !crvalid && !cdvalid;
+  logic request_crosses_4k;
+  logic issue_ready;
+  assign request_crosses_4k = ({1'b0, src_line[7:0]} + {1'b0, src_len}) > 9'd255;
+  assign issue_ready = (st == M_IDLE) && cfg_en && !rack && !wack &&
+                       !acvalid && !crvalid && !cdvalid && !sn_upd_fire;
+  assign ord_ready = issue_ready && !request_crosses_4k;
 
   // ---- AW 通道 ----
   assign awid     = aw_id_c;
@@ -471,7 +481,8 @@ module module_a (
   assign awvalid  = (st == M_W_AW);
 
   // ---- W 通道 ----
-  assign wdata  = line_data(ord_line_l + {{(TAG_W-8){1'b0}}, main_beat_cnt});
+  assign wdata  = line_data(ord_line_l + {{(TAG_W-8){1'b0}}, main_beat_cnt},
+                            cfg_data_mode, cfg_prbs_code, cfg_xcode);
   assign wstrb  = {STRB_W{1'b1}};
   assign wlast  = (main_beat_cnt == ord_len_l);
   assign wvalid = (st == M_W_W);
@@ -500,7 +511,8 @@ module module_a (
 
   // ---- R 通道 ----
   logic [DATA_W-1:0] rdata_exp;
-  assign rdata_exp = line_data(ar_line_l + {{(TAG_W-8){1'b0}}, main_beat_cnt});
+  assign rdata_exp = line_data(ar_line_l + {{(TAG_W-8){1'b0}}, main_beat_cnt},
+                               cfg_data_mode, cfg_prbs_code, cfg_xcode);
   // (rdata_exp 依赖 ord_line_l 锁存的行 —— M_R_AR 时已拷贝到 ar_line_l)
 
   assign rready = (st == M_R_R);
@@ -515,7 +527,8 @@ module module_a (
       rack_q <= 1'b0;
       wack_q <= 1'b0;
     end else begin
-      rack_q <= (st == M_R_R) && rvalid && rready && rlast && (rid == ar_id_c);
+      rack_q <= (st == M_R_R) && rvalid && rready && rlast &&
+                (rid == ar_id_c) && (main_beat_cnt == ord_len_l) && !read_frame_bad;
       wack_q <= (st == M_W_B) && bvalid && bready && (bid == aw_id_c);
     end
   end
@@ -537,11 +550,11 @@ module module_a (
       ord_unq_l      <= 1'b0;
       ord_len_l      <= '0;
       main_beat_cnt  <= '0;
+      read_frame_bad <= 1'b0;
     end else begin
       case (st)
         // 接受一笔订单 (内部计数器或外部端口), 锁存为工作寄存器
-        M_IDLE: if (cfg_en && !rack && !wack && !acvalid && !crvalid &&
-                   !cdvalid && (!cfg_ord_ext || ord_valid)) begin
+        M_IDLE: if (ord_ready && (!cfg_ord_ext || ord_valid)) begin
                   st             <= src_write ? M_W_AW : M_R_AR;
                   ord_is_write_l <= src_write;
                   ord_line_l     <= src_line;
@@ -550,6 +563,7 @@ module module_a (
                   ord_unq_l      <= src_unq;
                   ord_len_l      <= src_len;
                   main_beat_cnt  <= '0;
+                  read_frame_bad <= 1'b0;
                   if (!cfg_ord_ext) begin           // 内部源: 推进计数器
                     if (re_rd) begin
                       re_rd <= 1'b0;                // 补读完成: 恢复正常轮转
@@ -581,7 +595,7 @@ module module_a (
                   if (wlast) st <= M_W_B;
                   else       main_beat_cnt <= main_beat_cnt + 1'b1;
                 end
-        M_W_B:  if (bvalid && bready)   st <= M_IDLE;  // 回空闲: 给 snoop 握手窗口
+        M_W_B:  if (bvalid && bready && (bid == aw_id_c)) st <= M_IDLE;
         M_R_AR: if (arvalid && arready) begin
                   st        <= M_R_R;
                   arsnoop_l <= ord_arsn_l;
@@ -589,8 +603,11 @@ module module_a (
                   main_beat_cnt <= '0;
                 end
         M_R_R:  if (rvalid && rready && (rid == ar_id_c)) begin
-                  if (rlast) st <= M_IDLE; // response完成；RACK下一拍发出
-                  else       main_beat_cnt <= main_beat_cnt + 1'b1;
+                  if (rlast == (main_beat_cnt == ord_len_l) && rlast &&
+                      !read_frame_bad) st <= M_IDLE;
+                  else if (rlast != (main_beat_cnt == ord_len_l))
+                    read_frame_bad <= 1'b1;
+                  else if (!read_frame_bad) main_beat_cnt <= main_beat_cnt + 1'b1;
                 end
         default: st <= M_IDLE;
       endcase
@@ -608,7 +625,7 @@ module module_a (
   assign sn_lk_addr = to_line(acaddr);
   // B serializes request acceptance after an earlier AC. A must accept that
   // AC while a main request waits for AW/AR READY, avoiding a CR/READY deadlock.
-  assign acready    = areset_n && (sn == S_IDLE);  // 复位期间保持低
+  assign acready    = areset_n && (sn == S_IDLE) && !sn_upd_fire;
 
   // CRRESP 决策表 (4 态 × 5 质询)
   // 注意: 用当前输入 acsnoop 计算 (握手时锁存计算结果)
@@ -681,6 +698,7 @@ module module_a (
       sn_upd_st_l <= ST_I;
       sn_idx_l    <= '0;
       sn_tag_l    <= '0;
+      sn_data_l   <= '0;
     end else begin
       sn_upd_fire <= 1'b0;                       // 单拍脉冲默认撤消
       case (sn)
@@ -691,6 +709,7 @@ module module_a (
                   sn_upd_st_l   <= sn_upd_st;
                   sn_idx_l      <= sn_slot;
                   sn_tag_l      <= sn_lk_addr;
+                  sn_data_l     <= c_data[sn_slot];
                   sn            <= S_CR;
                 end
         S_CR:   if (crvalid && crready) begin
@@ -708,7 +727,7 @@ module module_a (
   // CD 端口: UD 行被质询交数据 (单拍 = 整行 16B, 数据取自快照)
   // =====================================================================
   assign cdvalid = (sn == S_CD);
-  assign cddata  = c_data[sn_idx_l];
+  assign cddata  = sn_data_l;
   assign cdlast  = 1'b1;
 
   // =====================================================================
@@ -719,18 +738,22 @@ module module_a (
   logic main_progress, snoop_progress;
 
   assign main_progress = (awvalid && awready) || (wvalid && wready) ||
-                         (bvalid && bready) || (arvalid && arready) ||
-                         (rvalid && rready);
+                         (bvalid && bready && (bid == aw_id_c)) ||
+                         (arvalid && arready) ||
+                         (rvalid && rready && (rid == ar_id_c) && !read_frame_bad &&
+                          (rlast == (main_beat_cnt == ord_len_l)));
   assign snoop_progress = (acvalid && acready) || (crvalid && crready) ||
                           (cdvalid && cdready);
 
   always_ff @(posedge aclk or negedge areset_n) begin
-    if (!areset_n || cfg_err_clr) begin
+    if (!areset_n) begin
       o_main_wait_cnt    <= '0;
       o_snoop_wait_cnt   <= '0;
       err_main_timeout_q <= 1'b0;
       err_snoop_timeout_q<= 1'b0;
     end else begin
+      if (cfg_err_clr && (st == M_IDLE)) err_main_timeout_q <= 1'b0;
+      if (cfg_err_clr && (sn == S_IDLE)) err_snoop_timeout_q <= 1'b0;
       if ((st == M_IDLE) || main_progress)
         o_main_wait_cnt <= '0;
       else if (o_main_wait_cnt < ACE_TIMEOUT)
@@ -750,16 +773,25 @@ module module_a (
   end
 
   always_ff @(posedge aclk or negedge areset_n) begin
-    if (!areset_n || cfg_err_clr) begin
+    if (!areset_n) begin
       err_rd_data_q <= 1'b0;
       err_rsp_q     <= 1'b0;
     end else begin
+      if (cfg_err_clr && st == M_IDLE && sn == S_IDLE) begin
+        err_rd_data_q <= 1'b0;
+        err_rsp_q     <= 1'b0;
+      end
+      if (issue_ready && (!cfg_ord_ext || ord_valid) && request_crosses_4k)
+        err_rsp_q <= 1'b1;
       // 读数据逐拍互核
       if (rvalid && rready && (st == M_R_R) && (rid == ar_id_c) &&
           (rdata != rdata_exp))
         err_rd_data_q <= 1'b1;
       // 响应码: BRESP 须 OKAY
-      if ((st == M_W_B) && bvalid && (bid == aw_id_c) && (bresp != 2'b00))
+      if (bvalid && bready && ((bid != aw_id_c) || (bresp != 2'b00)))
+        err_rsp_q <= 1'b1;
+      if (rvalid && rready &&
+          ((rid != ar_id_c) || (rlast != (main_beat_cnt == ord_len_l))))
         err_rsp_q <= 1'b1;
       // RRESP 合法性: 低 2 位须 OKAY; PassDirty 仅 RU 合法; IsShared 仅 RS 合法
       if (rvalid && rready && (st == M_R_R) && (rid == ar_id_c)) begin

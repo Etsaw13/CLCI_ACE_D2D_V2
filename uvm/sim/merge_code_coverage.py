@@ -534,7 +534,7 @@ def main():
                         help='Project root (default: determined from this script)')
     parser.add_argument('--run', type=Path, action='append', default=[], help='Repeat for a compatible subset; each run must belong to selected environment')
     parser.add_argument('--output', type=Path,
-                        help='New report directory under ' + ENVIRONMENT + '/out/code_coverage, or outside the project')
+                        help='New directory under uvm/out/code_coverage, in a UVM regression batch, or outside the project')
     args = parser.parse_args()
     root = args.project_root.resolve()
     records, skipped = select_runs(root, ENVIRONMENT, args.run)
@@ -544,8 +544,11 @@ def main():
     if args.output:
         out = args.output.resolve()
         report_root = (root / ENVIRONMENT / 'out' / 'code_coverage').resolve()
-        if inside(out, root) and not inside(out, report_root):
-            fail('Report output inside the project must be under ' + ENVIRONMENT + '/out/code_coverage')
+        regression_root = (root / ENVIRONMENT / 'out' / 'regression').resolve()
+        batch_code_report = (out.name == 'code_coverage' and out.parent.parent == regression_root
+                             and out.parent.is_dir())
+        if inside(out, root) and not (inside(out, report_root) or batch_code_report):
+            fail('Report output must be in uvm/out/code_coverage or uvm/out/regression/<batch>/code_coverage')
         if any(inside(out, r['directory']) for r in records):
             fail('Report output must not overwrite an input run')
         out.mkdir(parents=True, exist_ok=False)

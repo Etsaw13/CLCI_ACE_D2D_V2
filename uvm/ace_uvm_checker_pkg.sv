@@ -103,8 +103,8 @@ package ace_uvm_checker_pkg;
       if(int'(address[11:0])+n*16>4096)
         fail($sformatf("Burst crosses 4KB: addr=%h beats=%0d",address,n));
     endfunction
-    function logic [127:0] data_at(input bit [43:0] address,input int beat);
-      return expected_data(address,mode,code,fixed_byte,8'(beat));
+    function logic [127:0] data_at(input bit [43:0] address);
+      return expected_data(address,mode,code,fixed_byte);
     endfunction
     function void endpoint(input int side,ch,input logic valid,ready,input logic [255:0] payload);
       if($isunknown({valid,ready}) || (valid && $isunknown(payload)))
@@ -183,7 +183,7 @@ package ace_uvm_checker_pkg;
         write_value=w_t'(t.sp[W]);
         if(!sw_active) fail("Source W without AW");
         address=sw.addr+44'(sw_beat*16);
-        if(write_value.data!==data_at(address,sw_beat) || write_value.strb!==16'hffff ||
+        if(write_value.data!==data_at(address) || write_value.strb!==16'hffff ||
            write_value.last!==(sw_beat==int'(sw.len))) fail("Source W data/STRB/LAST mismatch");
         if(write_value.last) sw_active=0;else sw_beat++;
       end
@@ -198,7 +198,7 @@ package ace_uvm_checker_pkg;
         if(!br_active) fail("Source R without delivered AR");
         address=br.addr+44'(br_beat*16);slot=int'(address[5:4]);
         data_expected=(memory_valid[slot] && memory_tag[slot]==address[43:4])?
-          memory[slot]:data_at(address,br_beat);
+          memory[slot]:data_at(address);
         if(read_value.data!==data_expected || read_value.id!==br.id ||
            read_value.last!==(br_beat==int'(br.len)) || read_value.resp[1:0]!==0 ||
            read_value.resp[RR_PASSDIRTY] !== (br.snoop==ARSNOOP_READ_UNIQUE) ||

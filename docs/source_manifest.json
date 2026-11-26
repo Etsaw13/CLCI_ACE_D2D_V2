@@ -1,7 +1,7 @@
 {
   "ace_commit": "6c306d613fd095f712caa8df44ccbe82f55569ae",
   "clci_baseline": "myserver:/cluster/home/yvly/mywork/CLCI_ACE_D2D",
-  "phase": "DV and independent UVM implemented; target VCS/CLCI validation pending",
+  "phase": "ACE RTL fixes through CLCI_ACE_D2D_V2 commit 1017b3b; DV and UVM regression baseline",
   "files": [
     {
       "path": "ace/ace_pkg.sv",
@@ -10,18 +10,18 @@
     },
     {
       "path": "ace/ace_funcs.svh",
-      "source": "ACE git 6c306d613fd095f712caa8df44ccbe82f55569ae/rtl/ace_funcs.svh",
-      "sha256": "3e3aba622f0e602b44127d56e7fafc74656de6dbb06cdb26938a8dc8970ddb58"
+      "source": "ACE git 6c306d613fd095f712caa8df44ccbe82f55569ae/rtl/ace_funcs.svh + V2 fixes through 1017b3b",
+      "sha256": "5b724268d562bb662cd2ee3b35fd397690ec4cd9e308a2d5fc65abe8ec16cbfd"
     },
     {
       "path": "ace/module_a.sv",
-      "source": "ACE git 6c306d613fd095f712caa8df44ccbe82f55569ae/rtl/module_a.sv",
-      "sha256": "b34cff86db0aab09f287f6b1e569062ec84e8ff9cbcbc35fc3f85b46a628da29"
+      "source": "ACE git 6c306d613fd095f712caa8df44ccbe82f55569ae/rtl/module_a.sv + V2 fixes through 1017b3b",
+      "sha256": "14c08956cd1dc744416017a20731111893a707cdd743db96e247819600adcc0c"
     },
     {
       "path": "ace/module_b.sv",
-      "source": "ACE git 6c306d613fd095f712caa8df44ccbe82f55569ae/rtl/module_b.sv",
-      "sha256": "2c1ed801b1db4bf155cca5e4517a7e5039836ebd34c7f66020a2ff2d1025bab4"
+      "source": "ACE git 6c306d613fd095f712caa8df44ccbe82f55569ae/rtl/module_b.sv + V2 fixes through 1017b3b",
+      "sha256": "6c2776fb468fd956cd798784beebd4f73c306c161ae1ae9f336a9235081ad84d"
     },
     {
       "path": "clci/rtl/define_bmx_ace128.v",
